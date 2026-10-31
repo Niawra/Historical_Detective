@@ -1,68 +1,33 @@
 import React from 'react';
-import { useGame, GameProvider } from './context/GameContext';
-import { TitleScreen } from './components/TitleScreen';
-import { CaseSelectModal } from './components/CaseSelectModal';
-import { CaseBriefing } from './components/CaseBriefing';
-import { InvestigationDesk } from './components/InvestigationDesk';
-import { EvidenceBoard } from './components/EvidenceBoard';
-import { CaseReportModal } from './components/CaseReportModal';
-
-// Modals
-import { EvidenceArchiveModal } from './components/EvidenceArchiveModal';
-import { TimelinePuzzleModal } from './components/TimelinePuzzleModal';
-import { RoleMatchingPuzzleModal } from './components/RoleMatchingPuzzleModal';
-import { CipherPuzzleModal } from './components/CipherPuzzleModal';
-import { DetectiveNotesModal } from './components/DetectiveNotesModal';
-import { FinalDeductionModal } from './components/FinalDeductionModal';
-import { SettingsModal } from './components/SettingsModal';
-import { EvidenceDiscoveredToast } from './components/EvidenceDiscoveredToast';
+import { AdventureProvider, useAdventure } from './context/AdventureContext';
+import { MainMenu } from './components/adventure/MainMenu';
+import { MissionSelect } from './components/adventure/MissionSelect';
+import { AdventureGameplay } from './components/adventure/AdventureGameplay';
+import { InvestigationReport } from './components/adventure/InvestigationReport';
 
 const GameRouter: React.FC = () => {
-  const { activeView, activeModal } = useGame();
+  const { screen } = useAdventure();
 
-  const renderActiveView = () => {
-    switch (activeView) {
-      case 'TITLE':
-        return <TitleScreen />;
-      case 'CASE_SELECT':
-        return <CaseSelectModal />;
-      case 'BRIEFING':
-        return <CaseBriefing />;
-      case 'INVESTIGATION':
-        return <InvestigationDesk />;
-      case 'EVIDENCE_BOARD':
-        return <EvidenceBoard />;
-      case 'CASE_REPORT':
-        return <CaseReportModal />;
-      default:
-        return <TitleScreen />;
-    }
-  };
-
-  return (
-    <div className="relative min-h-screen bg-detective-950 font-sans selection:bg-seal-red selection:text-white">
-      {/* Primary View */}
-      {renderActiveView()}
-
-      {/* Floating Modal Overlays */}
-      {(activeModal === 'ARCHIVE' || activeModal === 'EVIDENCE_DETAIL') && <EvidenceArchiveModal />}
-      {activeModal === 'TIMELINE' && <TimelinePuzzleModal />}
-      {activeModal === 'MATCHING' && <RoleMatchingPuzzleModal />}
-      {activeModal === 'CIPHER' && <CipherPuzzleModal />}
-      {activeModal === 'NOTES' && <DetectiveNotesModal />}
-      {activeModal === 'DEDUCTION' && <FinalDeductionModal />}
-      {activeModal === 'SETTINGS' && <SettingsModal />}
-
-      {/* Toast Notification for Discovered Evidence */}
-      <EvidenceDiscoveredToast />
-    </div>
-  );
+  switch (screen) {
+    case 'MENU_UTAMA':
+      return <MainMenu />;
+    case 'PILIH_MISI':
+      return <MissionSelect />;
+    case 'GAMEPLAY':
+      return <AdventureGameplay />;
+    case 'HASIL_INVESTIGASI':
+      return <InvestigationReport />;
+    default:
+      return <MainMenu />;
+  }
 };
 
 export default function App() {
   return (
-    <GameProvider>
-      <GameRouter />
-    </GameProvider>
+    <AdventureProvider>
+      <div className="relative min-h-screen bg-[#0d0b09] text-parchment-100 font-sans selection:bg-seal-red selection:text-white">
+        <GameRouter />
+      </div>
+    </AdventureProvider>
   );
 }

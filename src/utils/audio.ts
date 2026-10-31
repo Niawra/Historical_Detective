@@ -211,6 +211,81 @@ class SoundManager {
     }
   }
 
+  // Footstep sound for character walking
+  public playStep() {
+    if (this.isMuted) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(90 + Math.random() * 25, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.05);
+      
+      gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.05);
+    } catch {
+      // fallback
+    }
+  }
+
+  // Dialogue blip
+  public playDialogue() {
+    if (this.isMuted) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(280 + Math.random() * 80, this.ctx.currentTime);
+      
+      gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.04);
+    } catch {
+      // fallback
+    }
+  }
+
+  // Badge achievement unlock
+  public playBadge() {
+    if (this.isMuted) return;
+    try {
+      this.initCtx();
+      if (!this.ctx) return;
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.07);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime + i * 0.07);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.07 + 0.35);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(this.ctx.currentTime + i * 0.07);
+        osc.stop(this.ctx.currentTime + i * 0.07 + 0.4);
+      });
+    } catch {
+      // fallback
+    }
+  }
+
   // Puzzle success or mystery solved
   public playSuccess() {
     if (this.isMuted) return;
