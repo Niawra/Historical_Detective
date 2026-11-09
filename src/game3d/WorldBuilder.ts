@@ -9,6 +9,7 @@ export interface CollisionBox {
 
 export class WorldBuilder {
   public static collisionBoxes: CollisionBox[] = [];
+  public static enableCollision: boolean = true; // Debuggable collision toggle
 
   // Ground elevation query function for player and NPC grounding
   public static getTerrainHeight(x: number, z: number): number {
@@ -749,6 +750,8 @@ export class WorldBuilder {
 
   // Check collision for player capsule
   public static checkCollision(x: number, z: number, radius: number = 0.45): boolean {
+    if (!this.enableCollision) return false;
+
     for (const box of this.collisionBoxes) {
       if (
         x + radius > box.minX &&

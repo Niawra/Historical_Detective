@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Engine3D, NearbyTarget } from '../../game3d/Engine3D';
+import { Engine3D, NearbyTarget, ActionKeyType } from '../../game3d/Engine3D';
+import { WorldBuilder } from '../../game3d/WorldBuilder';
 import { HUDOverlay } from './HUDOverlay';
 import { DialogueOverlay } from './DialogueOverlay';
 import { MiniGameModal } from './MiniGameModal';
@@ -8,6 +9,7 @@ import { WorldSelectModal } from './WorldSelectModal';
 import { PauseSettingsModal } from './PauseSettingsModal';
 import { LevelCompleteModal } from './LevelCompleteModal';
 import { TouchControls } from './TouchControls';
+import { MovementDebugHUD, DebugTelemetryData } from './MovementDebugHUD';
 import { 
   HistoricalWorldId, 
   Quest, 
@@ -56,6 +58,10 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
   const [isWorldSelectOpen, setIsWorldSelectOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLevelCompleteOpen, setIsLevelCompleteOpen] = useState<boolean>(false);
+
+  // Real-time Movement Debugging HUD state (active by default during debugging)
+  const [isDebugOpen, setIsDebugOpen] = useState<boolean>(true);
+  const [debugTelemetry, setDebugTelemetry] = useState<DebugTelemetryData | null>(null);
 
   // Active quest
   const activeQuest = quests[activeQuestIndex] || quests[0];
@@ -114,6 +120,88 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
     });
   }, [activeQuestIndex, addXP, unlockBadge]);
 
+  // Handle Player Interaction
+  const handleInteract = useCallback(() => {
+    const target = engineRef.current?.nearbyTarget;
+    if (!target) return;
+    sound.playClick();
+
+    if (target.type === 'NPC') {
+      const npc = target.entityData as NPCEntity;
+      setActiveDialogueNPC(npc);
+
+      let lines = npc.dialogueTree.greeting;
+      if (npc.id === 'npc-singgih' && activeQuest.id === 'quest-01-singgih') {
+        lines = npc.dialogueTree.greeting;
+      } else if (npc.id === 'npc-djiaw') {
+        const hasPouch = collectibles.find(c => c.id === 'col-dispatch-pouch')?.isFound;
+        if (!hasPouch) {
+          lines = npc.dialogueTree.questDialogue || npc.dialogueTree.greeting;
+        } else {
+          lines = npc.dialogueTree.completedDialogue || npc.dialogueTree.greeting;
+        }
+      } else if (npc.id === 'npc-soebardjo') {
+        lines = npc.dialogueTree.greeting;
+      }
+
+      setDialogueLines(lines);
+    } else if (target.type === 'COLLECTIBLE') {
+      const item = target.entityData as CollectibleItem;
+      collectItem(item);
+    } else if (target.type === 'CHEST') {
+      setActiveMiniGame({
+        type: 'CIPHER',
+        title: 'Peti Sandi Telegraf Komando PETA',
+        instructions: 'Gembok komando ini disegel dengan sandi 4 digit. Petunjuk: Hari dan Bulan tibanya Bung Karno dan Bung Hatta di Rengasdengklok (Format DDMM).',
+        isOpen: true
+      });
+    }
+  }, [activeQuest.id, collectibles]);
+
+  // Collect artifact handler
+  const collectItem = useCallback((item: CollectibleItem) => {
+    sound.playCollectible();
+    addXP(75);
+    unlockBadge('badge-first-explorer');
+
+    setCollectibles(prev => {
+      const updated = prev.map(c => c.id === item.id ? { ...c, isFound: true } : c);
+      if (updated.filter(c => c.isFound).length === updated.length) {
+        unlockBadge('badge-history-hunter');
+      }
+      return updated;
+    });
+
+    if (engineRef.current) {
+      engineRef.current.removeCollectibleMesh(item.id);
+    }
+
+    if (item.id === 'col-dispatch-pouch') {
+      advanceActiveQuest();
+    }
+  }, [addXP, advanceActiveQuest, unlockBadge]);
+
+  // Action key dispatch from engine
+  const handleActionKey = useCallback((action: ActionKeyType) => {
+    switch (action) {
+      case 'INTERACT':
+        handleInteract();
+        break;
+      case 'JOURNAL':
+        setIsJournalOpen(prev => !prev);
+        break;
+      case 'MAP':
+        setIsWorldSelectOpen(prev => !prev);
+        break;
+      case 'SETTINGS':
+        setIsSettingsOpen(prev => !prev);
+        break;
+      case 'TOGGLE_DEBUG':
+        setIsDebugOpen(prev => !prev);
+        break;
+    }
+  }, [handleInteract]);
+
   // Active quest target synchronization with Engine3D
   useEffect(() => {
     if (!engineRef.current) return;
@@ -137,8 +225,12 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Create fresh instance of engine
     const engine = new Engine3D(containerRef.current);
     engineRef.current = engine;
+
+    // Attach action key callback
+    engine.onActionKey = handleActionKey;
 
     // Window resize handler
     const handleResize = () => {
@@ -147,163 +239,21 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
     };
     window.addEventListener('resize', handleResize);
 
-    // Keyboard bindings for PC controls
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
-
-      switch (e.key.toLowerCase()) {
-        case 'w':
-        case 'arrowup':
-          engine.controls.forward = true;
-          break;
-        case 's':
-        case 'arrowdown':
-          engine.controls.backward = true;
-          break;
-        case 'a':
-        case 'arrowleft':
-          engine.controls.left = true;
-          break;
-        case 'd':
-        case 'arrowright':
-          engine.controls.right = true;
-          break;
-        case ' ':
-          e.preventDefault();
-          engine.controls.jump = true;
-          break;
-        case 'shift':
-          engine.controls.sprint = true;
-          break;
-        case 'e':
-        case 'enter':
-          handleInteract();
-          break;
-        case 'tab':
-        case 'b':
-          e.preventDefault();
-          setIsJournalOpen(prev => !prev);
-          break;
-        case 'm':
-          e.preventDefault();
-          setIsWorldSelectOpen(prev => !prev);
-          break;
-        case 'escape':
-          setIsSettingsOpen(prev => !prev);
-          break;
+    // Poll nearby target and debug telemetry periodically (every 50ms)
+    const pollInterval = setInterval(() => {
+      if (engine.nearbyTarget?.id !== nearbyTarget?.id) {
+        setNearbyTarget(engine.nearbyTarget);
       }
-    };
-
-    const onKeyUp = (e: KeyboardEvent) => {
-      switch (e.key.toLowerCase()) {
-        case 'w':
-        case 'arrowup':
-          engine.controls.forward = false;
-          break;
-        case 's':
-        case 'arrowdown':
-          engine.controls.backward = false;
-          break;
-        case 'a':
-        case 'arrowleft':
-          engine.controls.left = false;
-          break;
-        case 'd':
-        case 'arrowright':
-          engine.controls.right = false;
-          break;
-        case ' ':
-          engine.controls.jump = false;
-          break;
-        case 'shift':
-          engine.controls.sprint = false;
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-
-    // Poll nearby target from engine periodically (every 60ms)
-    const proximityInterval = setInterval(() => {
-      setNearbyTarget(engine.nearbyTarget);
-    }, 60);
+      setDebugTelemetry(engine.getDebugTelemetry());
+    }, 50);
 
     return () => {
-      clearInterval(proximityInterval);
+      clearInterval(pollInterval);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
       engine.destroy();
+      engineRef.current = null;
     };
-  }, []);
-
-  // Handle Player Interaction
-  const handleInteract = () => {
-    const target = engineRef.current?.nearbyTarget || nearbyTarget;
-    if (!target) return;
-    sound.playClick();
-
-    if (target.type === 'NPC') {
-      const npc = target.entityData as NPCEntity;
-      setActiveDialogueNPC(npc);
-
-      // Select appropriate dialogue lines
-      let lines = npc.dialogueTree.greeting;
-      if (npc.id === 'npc-singgih' && activeQuest.id === 'quest-01-singgih') {
-        lines = npc.dialogueTree.greeting;
-      } else if (npc.id === 'npc-djiaw') {
-        const hasPouch = collectibles.find(c => c.id === 'col-dispatch-pouch')?.isFound;
-        if (!hasPouch) {
-          lines = npc.dialogueTree.questDialogue || npc.dialogueTree.greeting;
-        } else {
-          lines = npc.dialogueTree.completedDialogue || npc.dialogueTree.greeting;
-        }
-      } else if (npc.id === 'npc-soebardjo') {
-        // Triggers timeline mini-game on finish
-        lines = npc.dialogueTree.greeting;
-      }
-
-      setDialogueLines(lines);
-    } else if (target.type === 'COLLECTIBLE') {
-      const item = target.entityData as CollectibleItem;
-      collectItem(item);
-    } else if (target.type === 'CHEST') {
-      // Open PETA Cipher Lock mini-game
-      setActiveMiniGame({
-        type: 'CIPHER',
-        title: 'Peti Sandi Telegraf Komando PETA',
-        instructions: 'Gembok komando ini disegel dengan sandi 4 digit. Petunjuk: Hari dan Bulan tibanya Bung Karno dan Bung Hatta di Rengasdengklok (Format DDMM).',
-        isOpen: true
-      });
-    }
-  };
-
-  // Collect artifact handler
-  const collectItem = (item: CollectibleItem) => {
-    sound.playCollectible();
-    addXP(75);
-    unlockBadge('badge-first-explorer');
-
-    // Update collectible state
-    setCollectibles(prev => {
-      const updated = prev.map(c => c.id === item.id ? { ...c, isFound: true } : c);
-      if (updated.filter(c => c.isFound).length === updated.length) {
-        unlockBadge('badge-history-hunter');
-      }
-      return updated;
-    });
-
-    // Remove 3D visual mesh from engine scene
-    if (engineRef.current) {
-      engineRef.current.removeCollectibleMesh(item.id);
-    }
-
-    // Check if item fulfills Quest 2 (Dispatch pouch)
-    if (item.id === 'col-dispatch-pouch') {
-      advanceActiveQuest();
-    }
-  };
+  }, [handleActionKey]);
 
   // Dialogue finish handler
   const handleDialogueFinish = () => {
@@ -321,7 +271,6 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
     } else if (speakerId === 'npc-soekarno' && activeQuest.id === 'quest-04-veranda') {
       advanceActiveQuest();
     } else if (speakerId === 'npc-soebardjo') {
-      // Launch Timeline mini-game
       setActiveMiniGame({
         type: 'TIMELINE',
         title: 'Kronologi Detik-Detik Menuju Proklamasi',
@@ -350,22 +299,42 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
   // Touch Direction input for Mobile
   const handleTouchDirection = (dx: number, dy: number) => {
     if (!engineRef.current) return;
-    engineRef.current.controls.forward = dy < -0.3;
-    engineRef.current.controls.backward = dy > 0.3;
-    engineRef.current.controls.left = dx < -0.3;
-    engineRef.current.controls.right = dx > 0.3;
+    engineRef.current.setVirtualMovement(
+      dy < -0.3, // forward
+      dy > 0.3,  // backward
+      dx < -0.3, // left
+      dx > 0.3   // right
+    );
   };
 
   const handleTouchJump = () => {
     if (!engineRef.current) return;
-    engineRef.current.controls.jump = true;
+    engineRef.current.setVirtualJump(true);
     setTimeout(() => {
-      if (engineRef.current) engineRef.current.controls.jump = false;
-    }, 150);
+      if (engineRef.current) engineRef.current.setVirtualJump(false);
+    }, 180);
   };
 
   const handleTouchSprint = (sprint: boolean) => {
-    if (engineRef.current) engineRef.current.controls.sprint = sprint;
+    if (engineRef.current) engineRef.current.setVirtualSprint(sprint);
+  };
+
+  // Manual direction buttons from MovementDebugger
+  const handleManualDirection = (dir: 'W' | 'A' | 'S' | 'D' | 'SPACE' | 'SHIFT', active: boolean) => {
+    if (!engineRef.current) return;
+    switch (dir) {
+      case 'W': engineRef.current.controls.forward = active; break;
+      case 'S': engineRef.current.controls.backward = active; break;
+      case 'A': engineRef.current.controls.left = active; break;
+      case 'D': engineRef.current.controls.right = active; break;
+      case 'SPACE': engineRef.current.controls.jump = active; break;
+      case 'SHIFT': engineRef.current.controls.sprint = active; break;
+    }
+  };
+
+  // Toggle collision in WorldBuilder
+  const handleToggleCollision = () => {
+    WorldBuilder.enableCollision = !WorldBuilder.enableCollision;
   };
 
   const toggleMute = () => {
@@ -388,8 +357,13 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-black select-none">
-      {/* 3D WebGL Canvas Container */}
-      <div ref={containerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
+      {/* 3D WebGL Canvas Container with auto-focus */}
+      <div 
+        ref={containerRef} 
+        tabIndex={0}
+        onClick={() => containerRef.current?.focus()}
+        className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing outline-none" 
+      />
 
       {/* Modern Adventure HUD Overlay */}
       <HUDOverlay
@@ -405,6 +379,15 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
         onOpenWorldSelect={() => setIsWorldSelectOpen(true)}
         isMuted={isMuted}
         onToggleMute={toggleMute}
+      />
+
+      {/* Movement Debugger HUD (Shows live keys, coordinates, velocities, and manual buttons) */}
+      <MovementDebugHUD
+        telemetry={debugTelemetry}
+        isOpen={isDebugOpen}
+        onToggle={() => setIsDebugOpen(prev => !prev)}
+        onPressDirection={handleManualDirection}
+        onToggleCollision={handleToggleCollision}
       />
 
       {/* NPC Dialogue Overlay */}

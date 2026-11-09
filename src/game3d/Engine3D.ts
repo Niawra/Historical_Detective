@@ -20,6 +20,8 @@ export interface NearbyTarget {
   entityData?: unknown;
 }
 
+export type ActionKeyType = 'INTERACT' | 'JOURNAL' | 'MAP' | 'SETTINGS' | 'TOGGLE_DEBUG';
+
 export class Engine3D {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
@@ -28,8 +30,8 @@ export class Engine3D {
 
   // Camera Orbit & Follow
   public cameraYaw: number = 0;
-  public cameraPitch: number = 0.38; // Ideal elevated downward angle (~22 deg)
-  public cameraDistance: number = 7.2; // Broader cinematic overview
+  public cameraPitch: number = 0.38; // Elevated downward angle (~22 deg)
+  public cameraDistance: number = 7.2;
   private isMouseDown: boolean = false;
   private prevMouseX: number = 0;
   private prevMouseY: number = 0;
@@ -61,18 +63,29 @@ export class Engine3D {
   private waterMesh: THREE.Mesh | null = null;
 
   // Interactive targets & priority
-  public activeTargetId: string | null = 'npc-singgih'; // Priority target from active quest
+  public activeTargetId: string | null = 'npc-singgih';
   public nearbyTarget: NearbyTarget | null = null;
   public onInteractCallback?: (target: NearbyTarget) => void;
   public onCollectCallback?: (item: CollectibleItem) => void;
+  public onActionKey?: (action: ActionKeyType) => void;
 
   // Animation frame
   private reqId: number | null = null;
   private clock: THREE.Clock;
   private stepCooldown: number = 0;
 
+  // Cleanup listeners reference
+  private cleanupListeners: (() => void)[] = [];
+  private containerElement: HTMLDivElement;
+
   constructor(container: HTMLDivElement) {
+    this.containerElement = container;
     this.clock = new THREE.Clock();
+
+    // Clean container first to prevent duplicate canvases
+    container.innerHTML = '';
+    container.tabIndex = 0;
+    container.style.outline = 'none';
 
     // 1. Scene
     this.scene = new THREE.Scene();
@@ -80,18 +93,25 @@ export class Engine3D {
     this.scene.fog = new THREE.FogExp2(0x9fc3e8, 0.009);
 
     // 2. Camera
-    const aspect = container.clientWidth / container.clientHeight;
+    const width = Math.max(container.clientWidth, 320);
+    const height = Math.max(container.clientHeight, 240);
+    const aspect = width / height;
     this.camera = new THREE.PerspectiveCamera(54, aspect, 0.1, 350);
 
     // 3. Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
     container.appendChild(this.renderer.domElement);
+
+    // Auto-focus container so keyboard is immediately active
+    setTimeout(() => {
+      try { container.focus(); } catch { /* ignore */ }
+    }, 50);
 
     // 4. Lights
     this.setupLighting();
@@ -102,7 +122,6 @@ export class Engine3D {
 
     // 6. Spawn Player
     this.player = new Character3D();
-    // Spawn player on the open south road, facing north towards village crossroads
     this.player.mesh.position.set(0, 0, 24);
     this.player.mesh.rotation.y = Math.PI; // Face north
     this.scene.add(this.player.mesh);
@@ -116,7 +135,7 @@ export class Engine3D {
     // 9. Floating Leaf/Dust Particle System
     this.setupParticles();
 
-    // 10. Bind Input & Listeners
+    // 10. Bind Input & Listeners (Mouse, Touch, Keyboard)
     this.bindInputs(container);
 
     // 11. Start Loop
@@ -125,11 +144,9 @@ export class Engine3D {
   }
 
   private setupLighting(): void {
-    // Soft morning ambient & hemisphere fill
     const hemiLight = new THREE.HemisphereLight(0xfffaee, 0x4f772d, 0.75);
     this.scene.add(hemiLight);
 
-    // Warm Morning Sun (DirectionalLight)
     const sun = new THREE.DirectionalLight(0xfff2d4, 1.35);
     sun.position.set(45, 60, 35);
     sun.castShadow = true;
@@ -148,7 +165,6 @@ export class Engine3D {
 
   private spawnNPCs(): void {
     WORLD_01_NPCS.forEach(npc => {
-      // Guarantee NPC stands exactly on ground / veranda platform
       const terrainY = WorldBuilder.getTerrainHeight(npc.position.x, npc.position.z);
       const effectiveY = Math.max(npc.position.y, terrainY);
       const entity: NPCEntity = {
@@ -195,11 +211,12 @@ export class Engine3D {
   }
 
   private bindInputs(container: HTMLDivElement): void {
-    // Mouse orbit
+    // 1. Mouse Orbit Drag
     const onMouseDown = (e: MouseEvent) => {
       this.isMouseDown = true;
       this.prevMouseX = e.clientX;
       this.prevMouseY = e.clientY;
+      container.focus();
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -207,7 +224,6 @@ export class Engine3D {
       const dx = e.clientX - this.prevMouseX;
       const dy = e.clientY - this.prevMouseY;
       this.cameraYaw -= dx * 0.005;
-      // Clamped pitch: 0.18 (~10 deg) to 0.85 (~49 deg) so it never clips into ground or view straight up
       this.cameraPitch = Math.max(0.18, Math.min(0.85, this.cameraPitch + dy * 0.005));
       this.prevMouseX = e.clientX;
       this.prevMouseY = e.clientY;
@@ -227,7 +243,14 @@ export class Engine3D {
     window.addEventListener('mouseup', onMouseUp);
     container.addEventListener('wheel', onWheel, { passive: false });
 
-    // Touch orbit for mobile
+    this.cleanupListeners.push(() => {
+      container.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      container.removeEventListener('wheel', onWheel);
+    });
+
+    // 2. Touch Orbit for Mobile
     let touchStartX = 0;
     let touchStartY = 0;
 
@@ -251,9 +274,107 @@ export class Engine3D {
 
     container.addEventListener('touchstart', onTouchStart, { passive: true });
     container.addEventListener('touchmove', onTouchMove, { passive: true });
+
+    this.cleanupListeners.push(() => {
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+    });
+
+    // 3. Direct Keyboard Input Handlers with Full Code & Key Support
+    const handleKey = (e: KeyboardEvent, isDown: boolean) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const code = e.code;
+      const key = e.key ? e.key.toLowerCase() : '';
+
+      let matchedMovement = false;
+
+      // FORWARD: W or ArrowUp
+      if (code === 'KeyW' || code === 'ArrowUp' || key === 'w' || key === 'arrowup' || key === 'up') {
+        this.controls.forward = isDown;
+        matchedMovement = true;
+      }
+
+      // BACKWARD: S or ArrowDown
+      if (code === 'KeyS' || code === 'ArrowDown' || key === 's' || key === 'arrowdown' || key === 'down') {
+        this.controls.backward = isDown;
+        matchedMovement = true;
+      }
+
+      // LEFT: A or ArrowLeft
+      if (code === 'KeyA' || code === 'ArrowLeft' || key === 'a' || key === 'arrowleft' || key === 'left') {
+        this.controls.left = isDown;
+        matchedMovement = true;
+      }
+
+      // RIGHT: D or ArrowRight
+      if (code === 'KeyD' || code === 'ArrowRight' || key === 'd' || key === 'arrowright' || key === 'right') {
+        this.controls.right = isDown;
+        matchedMovement = true;
+      }
+
+      // JUMP: Space
+      if (code === 'Space' || key === ' ' || key === 'spacebar') {
+        this.controls.jump = isDown;
+        matchedMovement = true;
+      }
+
+      // SPRINT: Shift
+      if (code === 'ShiftLeft' || code === 'ShiftRight' || key === 'shift') {
+        this.controls.sprint = isDown;
+        matchedMovement = true;
+      }
+
+      // Action shortcuts on KeyDown only
+      if (isDown) {
+        if (code === 'KeyE' || key === 'e' || key === 'enter') {
+          this.onActionKey?.('INTERACT');
+        } else if (code === 'Tab' || key === 'tab' || code === 'KeyB' || key === 'b') {
+          e.preventDefault();
+          this.onActionKey?.('JOURNAL');
+        } else if (code === 'KeyM' || key === 'm') {
+          e.preventDefault();
+          this.onActionKey?.('MAP');
+        } else if (code === 'Escape' || key === 'escape') {
+          this.onActionKey?.('SETTINGS');
+        } else if (code === 'F3' || key === 'f3') {
+          e.preventDefault();
+          this.onActionKey?.('TOGGLE_DEBUG');
+        }
+      }
+
+      if (matchedMovement && (code === 'Space' || code === 'ArrowUp' || code === 'ArrowDown')) {
+        e.preventDefault();
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => handleKey(e, true);
+    const onKeyUp = (e: KeyboardEvent) => handleKey(e, false);
+
+    // Reset controls when window loses focus
+    const onBlur = () => {
+      this.controls.forward = false;
+      this.controls.backward = false;
+      this.controls.left = false;
+      this.controls.right = false;
+      this.controls.jump = false;
+      this.controls.sprint = false;
+    };
+
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    window.addEventListener('keyup', onKeyUp, { capture: true });
+    window.addEventListener('blur', onBlur);
+
+    this.cleanupListeners.push(() => {
+      window.removeEventListener('keydown', onKeyDown, { capture: true });
+      window.removeEventListener('keyup', onKeyUp, { capture: true });
+      window.removeEventListener('blur', onBlur);
+    });
   }
 
   public handleResize(width: number, height: number): void {
+    if (width <= 0 || height <= 0) return;
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
@@ -261,6 +382,22 @@ export class Engine3D {
 
   public setActiveQuestTarget(targetId: string | null): void {
     this.activeTargetId = targetId;
+  }
+
+  // Programmatic movement injection for virtual controls / buttons
+  public setVirtualMovement(forward: boolean, backward: boolean, left: boolean, right: boolean): void {
+    this.controls.forward = forward;
+    this.controls.backward = backward;
+    this.controls.left = left;
+    this.controls.right = right;
+  }
+
+  public setVirtualJump(jump: boolean): void {
+    this.controls.jump = jump;
+  }
+
+  public setVirtualSprint(sprint: boolean): void {
+    this.controls.sprint = sprint;
   }
 
   public animate(): void {
@@ -288,7 +425,7 @@ export class Engine3D {
     const moveX = (this.controls.left ? -1 : 0) + (this.controls.right ? 1 : 0);
     const isMoving = moveX !== 0 || moveZ !== 0;
 
-    let speed = this.controls.sprint ? this.runSpeed : this.walkSpeed;
+    const speed = this.controls.sprint ? this.runSpeed : this.walkSpeed;
 
     if (isMoving) {
       // Normalize diagonal vector to avoid diagonal speed boost
@@ -308,10 +445,13 @@ export class Engine3D {
       const vx = Math.sin(targetRotation) * speed;
       const vz = Math.cos(targetRotation) * speed;
 
+      this.playerVelocity.x = vx;
+      this.playerVelocity.z = vz;
+
       const nextX = this.player.mesh.position.x + vx * delta;
       const nextZ = this.player.mesh.position.z + vz * delta;
 
-      // Collision Check (AABB box checking)
+      // Collision Check (AABB box checking) with sliding
       if (!WorldBuilder.checkCollision(nextX, this.player.mesh.position.z, 0.45)) {
         this.player.mesh.position.x = nextX;
       }
@@ -326,6 +466,9 @@ export class Engine3D {
         sound.playFootstep('grass');
         this.stepCooldown = 0;
       }
+    } else {
+      this.playerVelocity.x = 0;
+      this.playerVelocity.z = 0;
     }
 
     // Jump & Gravity Physics
@@ -358,27 +501,24 @@ export class Engine3D {
     } else if (isMoving) {
       animState = this.controls.sprint ? 'RUN' : 'WALK';
     }
+    this.currentAnim = animState;
     this.player.updateAnimation(animState, delta);
   }
 
   private updateCamera(): void {
-    // Camera focuses on character's upper torso / head
     const targetPos = this.player.mesh.position.clone().add(new THREE.Vector3(0, 1.6, 0));
 
-    // Spherical offset based on Yaw & Pitch
     const offsetX = Math.sin(this.cameraYaw) * Math.cos(this.cameraPitch) * this.cameraDistance;
     const offsetY = Math.sin(this.cameraPitch) * this.cameraDistance;
     const offsetZ = Math.cos(this.cameraYaw) * Math.cos(this.cameraPitch) * this.cameraDistance;
 
     const desiredCamPos = targetPos.clone().add(new THREE.Vector3(offsetX, offsetY, offsetZ));
 
-    // Ground safety: ensure camera never dips below terrain
     const terrainUnderCam = WorldBuilder.getTerrainHeight(desiredCamPos.x, desiredCamPos.z);
     if (desiredCamPos.y < terrainUnderCam + 0.6) {
       desiredCamPos.y = terrainUnderCam + 0.6;
     }
 
-    // Smooth camera lag
     this.camera.position.lerp(desiredCamPos, 0.16);
     this.camera.lookAt(targetPos);
   }
@@ -446,7 +586,6 @@ export class Engine3D {
   private checkProximity(): void {
     const playerPos = this.player.mesh.position;
     
-    // Player facing unit vector in XZ plane
     const playerFacing = new THREE.Vector3(
       Math.sin(this.player.mesh.rotation.y),
       0,
@@ -454,10 +593,9 @@ export class Engine3D {
     );
 
     let bestTarget: NearbyTarget | null = null;
-    let bestScore: number = 999; // Lower score is better
+    let bestScore: number = 999;
     const maxInteractDist = 3.8;
 
-    // Helper evaluation function
     const evaluateCandidate = (
       id: string, 
       type: 'NPC' | 'COLLECTIBLE' | 'CHEST', 
@@ -472,16 +610,12 @@ export class Engine3D {
       if (dist > maxInteractDist) return;
 
       toTarget.normalize();
-      const dot = playerFacing.dot(toTarget); // 1 = directly in front, -1 = behind
+      const dot = playerFacing.dot(toTarget);
 
-      // If object is completely behind player (> 90 deg off) and not immediately beside, penalize
       if (dot < 0.15 && dist > 1.6) return;
 
-      // Base score is distance minus facing alignment bonus
       let score = dist - (dot * 1.4);
 
-      // ACTIVE QUEST TARGET PRIORITY BONUS:
-      // If this target matches the active quest objective, give massive priority!
       if (this.activeTargetId && id === this.activeTargetId) {
         score -= 3.5;
       }
@@ -504,7 +638,7 @@ export class Engine3D {
       );
     });
 
-    // 2. Check Collectibles (only uncollected ones)
+    // 2. Check Collectibles
     WORLD_01_COLLECTIBLES.forEach(item => {
       if (!item.isFound) {
         evaluateCandidate(
@@ -530,6 +664,39 @@ export class Engine3D {
     this.nearbyTarget = bestTarget;
   }
 
+  // Real-time debug telemetry getter for on-screen debug panel
+  public getDebugTelemetry() {
+    const isMoving = this.controls.forward || this.controls.backward || this.controls.left || this.controls.right;
+    return {
+      keys: {
+        W: this.controls.forward,
+        A: this.controls.left,
+        S: this.controls.backward,
+        D: this.controls.right,
+        SPACE: this.controls.jump,
+        SHIFT: this.controls.sprint
+      },
+      pos: {
+        x: parseFloat(this.player.mesh.position.x.toFixed(2)),
+        y: parseFloat(this.player.mesh.position.y.toFixed(2)),
+        z: parseFloat(this.player.mesh.position.z.toFixed(2))
+      },
+      velocity: {
+        vx: parseFloat(this.playerVelocity.x.toFixed(2)),
+        vy: parseFloat(this.playerVelocity.y.toFixed(2)),
+        vz: parseFloat(this.playerVelocity.z.toFixed(2))
+      },
+      speed: this.controls.sprint ? this.runSpeed : this.walkSpeed,
+      isGrounded: this.isGrounded,
+      isMoving: isMoving,
+      animState: this.currentAnim,
+      collisionEnabled: WorldBuilder.enableCollision,
+      cameraYaw: parseFloat(this.cameraYaw.toFixed(2)),
+      cameraPitch: parseFloat(this.cameraPitch.toFixed(2)),
+      cameraDist: parseFloat(this.cameraDistance.toFixed(2))
+    };
+  }
+
   public removeCollectibleMesh(id: string): void {
     const mesh = this.collectibleMeshes.get(id);
     if (mesh) {
@@ -540,6 +707,16 @@ export class Engine3D {
 
   public destroy(): void {
     if (this.reqId) cancelAnimationFrame(this.reqId);
+
+    // Clean up all input event listeners
+    this.cleanupListeners.forEach(cleanup => cleanup());
+    this.cleanupListeners = [];
+
+    // Remove canvas from DOM
+    if (this.renderer.domElement && this.renderer.domElement.parentElement) {
+      this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
+    }
+
     this.renderer.dispose();
   }
 }
