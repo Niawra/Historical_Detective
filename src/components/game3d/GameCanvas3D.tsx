@@ -114,6 +114,25 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
     });
   }, [activeQuestIndex, addXP, unlockBadge]);
 
+  // Active quest target synchronization with Engine3D
+  useEffect(() => {
+    if (!engineRef.current) return;
+    let targetId: string | null = null;
+    if (activeQuest.id === 'quest-01-singgih') {
+      targetId = 'npc-singgih';
+    } else if (activeQuest.id === 'quest-02-dispatch') {
+      const hasPouch = collectibles.find(c => c.id === 'col-dispatch-pouch')?.isFound;
+      targetId = hasPouch ? 'npc-djiaw' : 'col-dispatch-pouch';
+    } else if (activeQuest.id === 'quest-03-cipher') {
+      targetId = 'chest-peta';
+    } else if (activeQuest.id === 'quest-04-veranda') {
+      targetId = 'npc-soekarno';
+    } else if (activeQuest.id === 'quest-05-timeline') {
+      targetId = 'npc-soebardjo';
+    }
+    engineRef.current.setActiveQuestTarget(targetId);
+  }, [activeQuest.id, collectibles]);
+
   // Instantiate Engine3D
   useEffect(() => {
     if (!containerRef.current) return;
@@ -205,12 +224,10 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
 
-    // Poll nearby target from engine periodically (every 100ms)
+    // Poll nearby target from engine periodically (every 60ms)
     const proximityInterval = setInterval(() => {
-      if (engine.nearbyTarget !== nearbyTarget) {
-        setNearbyTarget(engine.nearbyTarget);
-      }
-    }, 100);
+      setNearbyTarget(engine.nearbyTarget);
+    }, 60);
 
     return () => {
       clearInterval(proximityInterval);
@@ -223,11 +240,12 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
 
   // Handle Player Interaction
   const handleInteract = () => {
-    if (!nearbyTarget) return;
+    const target = engineRef.current?.nearbyTarget || nearbyTarget;
+    if (!target) return;
     sound.playClick();
 
-    if (nearbyTarget.type === 'NPC') {
-      const npc = nearbyTarget.entityData as NPCEntity;
+    if (target.type === 'NPC') {
+      const npc = target.entityData as NPCEntity;
       setActiveDialogueNPC(npc);
 
       // Select appropriate dialogue lines
@@ -247,10 +265,10 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
       }
 
       setDialogueLines(lines);
-    } else if (nearbyTarget.type === 'COLLECTIBLE') {
-      const item = nearbyTarget.entityData as CollectibleItem;
+    } else if (target.type === 'COLLECTIBLE') {
+      const item = target.entityData as CollectibleItem;
       collectItem(item);
-    } else if (nearbyTarget.type === 'CHEST') {
+    } else if (target.type === 'CHEST') {
       // Open PETA Cipher Lock mini-game
       setActiveMiniGame({
         type: 'CIPHER',

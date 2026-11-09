@@ -39,66 +39,78 @@ export class NPCBuilder {
     const pantsMat = new THREE.MeshLambertMaterial({ color: pantsColor });
     const shoesMat = new THREE.MeshLambertMaterial({ color: 0x1b1b1b });
 
-    // Torso
+    // Torso Group
+    const torsoGroup = new THREE.Group();
+    torsoGroup.name = 'NPCTorso';
+    torsoGroup.position.set(0, 1.05, 0);
+
     const torsoGeo = new THREE.BoxGeometry(0.55, 0.72, 0.35);
     const torso = new THREE.Mesh(torsoGeo, suitMat);
-    torso.position.y = 1.05;
     torso.castShadow = true;
-    group.add(torso);
+    torsoGroup.add(torso);
+    group.add(torsoGroup);
 
-    // Head
+    // Head Group
+    const headGroup = new THREE.Group();
+    headGroup.name = 'NPCHead';
+    headGroup.position.set(0, 1.55, 0);
+
     const headGeo = new THREE.BoxGeometry(0.36, 0.38, 0.36);
     const head = new THREE.Mesh(headGeo, skinMat);
-    head.position.y = 1.55;
     head.castShadow = true;
-    group.add(head);
+    headGroup.add(head);
 
     // Eyes
     const eyeGeo = new THREE.BoxGeometry(0.06, 0.06, 0.02);
     const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(-0.09, 1.56, 0.19);
+    leftEye.position.set(-0.09, 0.01, 0.19);
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(0.09, 1.56, 0.19);
-    group.add(leftEye, rightEye);
+    rightEye.position.set(0.09, 0.01, 0.19);
+    headGroup.add(leftEye, rightEye);
 
     // Headwear
     if (hasPeci) {
       // Iconic Indonesian Peci (Songkok)
       const peciGeo = new THREE.BoxGeometry(0.38, 0.22, 0.38);
       const peci = new THREE.Mesh(peciGeo, peciMat);
-      peci.position.set(0, 1.76, 0);
-      group.add(peci);
+      peci.position.set(0, 0.21, 0);
+      headGroup.add(peci);
     } else if (npc.modelStyle === 'farmer') {
       // Conical Straw Hat (Caping)
       const capingGeo = new THREE.ConeGeometry(0.48, 0.22, 16);
       const capingMat = new THREE.MeshLambertMaterial({ color: 0xd4a373 });
       const caping = new THREE.Mesh(capingGeo, capingMat);
-      caping.position.set(0, 1.82, 0);
-      group.add(caping);
+      caping.position.set(0, 0.27, 0);
+      headGroup.add(caping);
     } else if (npc.modelStyle === 'hatta') {
-      // Hatta's round spectacles!
+      // Hatta's round spectacles
       const specMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
       const specGeo = new THREE.RingGeometry(0.04, 0.06, 12);
       const leftSpec = new THREE.Mesh(specGeo, specMat);
-      leftSpec.position.set(-0.09, 1.56, 0.195);
+      leftSpec.position.set(-0.09, 0.01, 0.195);
       const rightSpec = new THREE.Mesh(specGeo, specMat);
-      rightSpec.position.set(0.09, 1.56, 0.195);
-      group.add(leftSpec, rightSpec);
+      rightSpec.position.set(0.09, 0.01, 0.195);
+      headGroup.add(leftSpec, rightSpec);
     } else if (npc.modelStyle === 'diplomat') {
       // Diplomat Fedora
       const fedoraGeo = new THREE.CylinderGeometry(0.24, 0.38, 0.16, 12);
       const fedoraMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
       const fedora = new THREE.Mesh(fedoraGeo, fedoraMat);
-      fedora.position.set(0, 1.78, 0);
-      group.add(fedora);
+      fedora.position.set(0, 0.23, 0);
+      headGroup.add(fedora);
     }
+
+    group.add(headGroup);
 
     // Arms
     const armGeo = new THREE.BoxGeometry(0.18, 0.6, 0.18);
     const leftArm = new THREE.Mesh(armGeo, suitMat);
+    leftArm.name = 'NPCLeftArm';
     leftArm.position.set(-0.36, 1.1, 0);
     leftArm.castShadow = true;
+
     const rightArm = new THREE.Mesh(armGeo, suitMat);
+    rightArm.name = 'NPCRightArm';
     rightArm.position.set(0.36, 1.1, 0);
     rightArm.castShadow = true;
     group.add(leftArm, rightArm);
@@ -113,7 +125,7 @@ export class NPCBuilder {
     rightLeg.castShadow = true;
     group.add(leftLeg, rightLeg);
 
-    // Shoes
+    // Shoes (resting bottom surface at exactly y = 0.0)
     const shoeGeo = new THREE.BoxGeometry(0.22, 0.16, 0.28);
     const leftShoe = new THREE.Mesh(shoeGeo, shoesMat);
     leftShoe.position.set(-0.15, 0.08, 0.04);

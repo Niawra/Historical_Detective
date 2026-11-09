@@ -172,7 +172,7 @@ export const WORLD_01_COLLECTIBLES: CollectibleItem[] = [
     description: 'Pesawat radio penerima gelombang pendek luar negeri yang digunakan Sutan Sjahrir dan para pemuda pejuang.',
     historicalFact: 'Melalui radio inilah berita Kaisar Hirohito membacakan Deklarasi Penyerahan Jepang tanpa syarat (Gyokuon-hoso) pertama kali didengar pemuda Indonesia pada 15 Agustus 1945.',
     sourceReference: 'Arsip Nasional RI & Sutan Sjahrir, Pikiran dan Tindakan (1947)',
-    position: { x: -28, y: 1.2, z: 12 },
+    position: { x: -25, y: 1.0, z: -5 },
     isFound: false,
     icon: '📻'
   },
@@ -184,7 +184,7 @@ export const WORLD_01_COLLECTIBLES: CollectibleItem[] = [
     description: 'Catatan hasil rapat rahasia pemuda di Laboratorium Bakteriologi Pegangsaan Timur yang dipimpin Chaerul Saleh.',
     historicalFact: 'Rapat pemuda memutuskan menolak kemerdekaan sebagai hadiah pemberian Jepang, serta menuntut proklamasi diumumkan atas kehendak rakyat sendiri.',
     sourceReference: 'Adam Malik, Riwayat Proklamasi Agustus 1945 (1962)',
-    position: { x: 5, y: 1.4, z: -18 },
+    position: { x: 4.8, y: 1.5, z: -8.2 },
     isFound: false,
     icon: '📜'
   },
@@ -196,7 +196,7 @@ export const WORLD_01_COLLECTIBLES: CollectibleItem[] = [
     description: 'Peta rute pertahanan militer darat dan sungai antara Batavia, Karawang, dan Rengasdengklok.',
     historicalFact: 'Daidan Purwakarta dan peleton Shodanco Singgih menjamin keamanan di wilayah Karawang utara dari penyusupan Kenpeitai (Polisi Militer Jepang).',
     sourceReference: 'Disjarah Angkatan Darat & Pusat Sejarah TNI',
-    position: { x: -35, y: 1.3, z: -8 },
+    position: { x: -33, y: 1.3, z: -4 },
     isFound: false,
     icon: '🗺️'
   },
@@ -208,7 +208,7 @@ export const WORLD_01_COLLECTIBLES: CollectibleItem[] = [
     description: 'Mata uang peredaran masa peralihan yang tertimbun di bawah pohon beringin tua desa.',
     historicalFact: 'Pada masa menjelang kemerdekaan, peredaran uang di Jawa bercampur antara uang militer Jepang (Dai Nippon Teikoku Seifu) dan uang peninggalan kolonial.',
     sourceReference: 'Museum Bank Indonesia & Khazanah Numismatik Sejarah',
-    position: { x: 22, y: 1.1, z: 25 },
+    position: { x: 16, y: 0.3, z: 14 },
     isFound: false,
     icon: '🪙'
   },
@@ -220,7 +220,7 @@ export const WORLD_01_COLLECTIBLES: CollectibleItem[] = [
     description: 'Dokumentasi otentik rumah panggung berdinding anyaman bambu milik Djiaw Kie Siong.',
     historicalFact: 'Hingga kini rumah bersejarah ini masih berdiri dan dirawat sebagai simbol gotong-royong warga lintas etnis dalam melindungi pemimpin kemerdekaan.',
     sourceReference: 'Museum Rumah Sejarah Djiaw Kie Siong, Rengasdengklok',
-    position: { x: 2, y: 1.2, z: 22 },
+    position: { x: -4.2, y: 1.6, z: -8.2 },
     isFound: false,
     icon: '📸'
   },
@@ -232,7 +232,7 @@ export const WORLD_01_COLLECTIBLES: CollectibleItem[] = [
     description: 'Kantong kulit berisi surat penghubung rahasia antara pemuda Jakarta dan perwira PETA Rengasdengklok.',
     historicalFact: 'Komunikasi antar-kelompok pemuda dilakukan secara klandestin menggunakan kurir sepeda dan mobil berkecepatan tinggi.',
     sourceReference: 'Mohammad Hatta, Memoir Sekitar Proklamasi (1970)',
-    position: { x: 28, y: 0.9, z: -25 },
+    position: { x: 3.5, y: -0.2, z: -35 },
     isFound: false,
     icon: '🎋'
   }
@@ -243,17 +243,17 @@ export const WORLD_01_NPCS: NPCEntity[] = [
     id: 'npc-singgih',
     name: 'Shodanco Singgih',
     role: 'Perwira Peleton PETA',
-    position: { x: -22, y: 1.0, z: -4 },
-    rotationY: Math.PI / 4,
+    position: { x: -21, y: 0.0, z: -3 },
+    rotationY: Math.PI * 0.5,
     modelStyle: 'peta',
     dialogueTree: {
       greeting: [
         'Salam pejuang! Saya Shodanco Singgih dari Daidan PETA Purwakarta.',
         'Kami telah membarikade jalan dari arah Jakarta. Rengasdengklok aman dan tentram di bawah perlindungan pasukan pribumi.',
-        'Bung Karno dan Bung Hatta berada di rumah Pak Djiaw Kie Siong di sebelah sana. Waspadalah terhadap intel Jepang!'
+        'Bung Karno dan Bung Hatta berada di rumah Pak Djiaw Kie Siong di sebelah utara. Waspadalah terhadap intel Kenpeitai!'
       ],
       questDialogue: [
-        'Kamu mencari petunjuk? Coba periksa radio telegraf di pos jaga. Suara siaran Tokyo baru saja terputus!'
+        'Kamu mencari petunjuk? Coba periksa peti sandi telegraf di pos jaga. Suara siaran Tokyo baru saja terputus!'
       ],
       completedDialogue: [
         'Terima kasih atas bantuanmu, Petualang! Kita akan mengawal Bung Karno kembali ke Jakarta begitu kesepakatan tercapai!'
@@ -264,17 +264,17 @@ export const WORLD_01_NPCS: NPCEntity[] = [
     id: 'npc-djiaw',
     name: 'Djiaw Kie Siong',
     role: 'Tuan Rumah Bersejarah',
-    position: { x: 12, y: 1.0, z: -6 },
-    rotationY: -Math.PI / 3,
+    position: { x: 5.5, y: 0.0, z: -4.5 },
+    rotationY: -Math.PI * 0.75,
     modelStyle: 'farmer',
     dialogueTree: {
       greeting: [
         'Selamat pagi anak muda! Selamat datang di Kampung Bojong.',
-        'Bung Karno, Bung Hatta, dan Ibu Fatmawati yang menggendong bayi Guntur sedang beristirahat di dalam.',
+        'Bung Karno, Bung Hatta, dan Ibu Fatmawati yang menggendong bayi Guntur sedang beristirahat di serambi atas.',
         'Rumah saya sederhana di tepi Sungai Citarum, namun kami sekeluarga merasa sangat terhormat dapat melindungi beliau berdua.'
       ],
       questDialogue: [
-        'Aduh celaka, kantong berkas penting dari pemuda tadi terjatuh waktu saya mengambil rebung di rumpun bambu tepi sungai. Bisakah kamu membantuku mencarinya?'
+        'Aduh celaka, kantong berkas penting dari pemuda tadi tertinggal di dermaga perahu tepi sungai waktu saya menambatkan sampan. Bisakah kamu membantuku mengambilnya?'
       ],
       completedDialogue: [
         'Terima kasih banyak! Berkas ini sangat berharga untuk kelancaran perundingan kemerdekaan kita.'
@@ -285,8 +285,8 @@ export const WORLD_01_NPCS: NPCEntity[] = [
     id: 'npc-soekarno',
     name: 'Ir. Soekarno',
     role: 'Pemimpin Besar Bangsa',
-    position: { x: 0, y: 2.1, z: -10 },
-    rotationY: 0,
+    position: { x: -1.2, y: 1.2, z: -8.5 },
+    rotationY: 0.1,
     modelStyle: 'soekarno',
     dialogueTree: {
       greeting: [
@@ -301,7 +301,7 @@ export const WORLD_01_NPCS: NPCEntity[] = [
     id: 'npc-hatta',
     name: 'Drs. Mohammad Hatta',
     role: 'Tokoh Proklamator',
-    position: { x: 3, y: 2.1, z: -10 },
+    position: { x: 2.4, y: 1.2, z: -8.5 },
     rotationY: -0.2,
     modelStyle: 'hatta',
     dialogueTree: {
@@ -315,8 +315,8 @@ export const WORLD_01_NPCS: NPCEntity[] = [
     id: 'npc-soebardjo',
     name: 'Mr. Achmad Soebardjo',
     role: 'Tokoh Senior Diplomat',
-    position: { x: -10, y: 1.0, z: 18 },
-    rotationY: Math.PI,
+    position: { x: -2.5, y: 0.0, z: 20 },
+    rotationY: 0,
     modelStyle: 'diplomat',
     dialogueTree: {
       greeting: [

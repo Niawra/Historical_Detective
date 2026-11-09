@@ -37,14 +37,20 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
     }
   };
 
-  const getAvatarIcon = (style: string) => {
+  const getAvatarBadge = (style: string) => {
     switch (style) {
-      case 'peta': return '💂';
-      case 'farmer': return '👴';
-      case 'soekarno': return '🇮🇩';
-      case 'hatta': return '👓';
-      case 'diplomat': return '🎩';
-      default: return '👤';
+      case 'peta':
+        return <span className="font-mono font-black text-xs text-amber-300">PETA</span>;
+      case 'farmer':
+        return <span className="font-mono font-black text-xs text-amber-200">BOJONG</span>;
+      case 'soekarno':
+        return <span className="font-mono font-black text-xs text-red-400">BUNG KARNO</span>;
+      case 'hatta':
+        return <span className="font-mono font-black text-xs text-amber-400">BUNG HATTA</span>;
+      case 'diplomat':
+        return <span className="font-mono font-black text-xs text-blue-300">DIPLOMAT</span>;
+      default:
+        return <span className="font-mono font-black text-xs text-amber-300">TOKOH</span>;
     }
   };
 
@@ -54,8 +60,8 @@ export const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
         {/* Top Header */}
         <div className="flex items-center justify-between border-b border-parchment-800 pb-3 mb-4">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-xl bg-amber-950/80 border border-amber-500/60 flex items-center justify-center text-2xl shadow-inner">
-              {getAvatarIcon(npc.modelStyle)}
+            <div className="w-12 h-12 rounded-xl bg-black/60 border border-white/20 flex items-center justify-center shadow-inner text-center px-1">
+              {getAvatarBadge(npc.modelStyle)}
             </div>
             <div>
               <h3 className="font-serif font-black text-base sm:text-lg text-amber-300">
