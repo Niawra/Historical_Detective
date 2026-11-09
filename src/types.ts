@@ -1,43 +1,73 @@
-export type GameScreen = 'MENU_UTAMA' | 'PILIH_MISI' | 'GAMEPLAY' | 'HASIL_INVESTIGASI';
+export type GameScreen = 'TITLE' | 'WORLD_SELECT' | 'GAMEPLAY' | 'LEVEL_COMPLETE';
 
-export type MissionLocationId = 
-  | 'LOC_1_BRIEFING'
-  | 'LOC_2_RENGASDENGKLOK'
-  | 'LOC_3_DOKUMEN'
-  | 'LOC_4_TIMELINE'
-  | 'LOC_5_DEDUKSI';
+export type HistoricalWorldId = 
+  | 'WORLD_01_RENGASDENGKLOK'
+  | 'WORLD_02_PROKLAMASI'
+  | 'WORLD_03_SURABAYA'
+  | 'WORLD_04_BANDUNG'
+  | 'WORLD_05_SUMPAH_PEMUDA';
 
-export interface DetectiveClue {
-  id: string;
-  title: string;
-  icon: string; // emoji or icon name
-  shortSummary: string;
-  fullDetail: string;
-  sourceStatus: 'SUMBER SEJARAH ASLI' | 'REKONSTRUKSI FAKTA';
-  dateFound?: string;
-}
-
-export interface PlayerPosition {
-  x: number;
-  y: number;
-  direction: 'DOWN' | 'UP' | 'LEFT' | 'RIGHT';
-  isMoving: boolean;
-}
-
-export interface MapObject {
-  id: string;
+export interface HistoricalWorld {
+  id: HistoricalWorldId;
   name: string;
-  x: number; // coordinate in world percentage or grid (0-100)
-  y: number;
-  width: number;
-  height: number;
-  type: 'CLUE' | 'NPC' | 'DOOR' | 'CHEST' | 'PROP';
-  spriteType: string;
-  dialogue?: string[];
-  clueReward?: DetectiveClue;
-  isExamined: boolean;
-  requiredCluesCount?: number; // for doors
-  targetLocation?: MissionLocationId;
+  year: number;
+  location: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  themeColor: string;
+  isUnlocked: boolean;
+  completionPercent: number;
+  totalCollectibles: number;
+  totalQuests: number;
+}
+
+export interface CharacterControlState {
+  forward: boolean;
+  backward: boolean;
+  left: boolean;
+  right: boolean;
+  jump: boolean;
+  sprint: boolean;
+  interact: boolean;
+}
+
+export type AnimationState = 'IDLE' | 'WALK' | 'RUN' | 'JUMP' | 'INTERACT';
+
+export interface QuestStep {
+  id: string;
+  description: string;
+  targetEntityId?: string;
+  targetLocation?: { x: number; z: number };
+  isCompleted: boolean;
+}
+
+export interface Quest {
+  id: string;
+  worldId: HistoricalWorldId;
+  title: string;
+  npcName: string;
+  npcRole: string;
+  description: string;
+  isMainQuest: boolean;
+  steps: QuestStep[];
+  currentStepIndex: number;
+  isCompleted: boolean;
+  rewardXP: number;
+  historicalContext: string;
+}
+
+export interface CollectibleItem {
+  id: string;
+  worldId: HistoricalWorldId;
+  name: string;
+  category: 'DOKUMEN' | 'ARTEFAK' | 'FOTO' | 'KOIN' | 'CATATAN';
+  description: string;
+  historicalFact: string;
+  sourceReference: string;
+  position: { x: number; y: number; z: number };
+  isFound: boolean;
+  icon: string;
 }
 
 export interface DetectiveBadge {
@@ -48,28 +78,23 @@ export interface DetectiveBadge {
   isUnlocked: boolean;
 }
 
-export interface MissionData {
+export interface NPCEntity {
   id: string;
-  number: number;
-  title: string;
-  subtitle: string;
-  year: number;
-  isUnlocked: boolean;
-  description: string;
-  tagline: string;
-  coverImageTheme: string;
+  name: string;
+  role: string;
+  position: { x: number; y: number; z: number };
+  rotationY: number;
+  modelStyle: 'peta' | 'elder' | 'farmer' | 'diplomat' | 'youth' | 'soekarno' | 'hatta';
+  dialogueTree: {
+    greeting: string[];
+    questDialogue?: string[];
+    completedDialogue?: string[];
+  };
 }
 
-export interface MissionProgress {
-  currentLocation: MissionLocationId;
-  clues: DetectiveClue[];
-  examinedObjectIds: string[];
-  roleMatchingSolved: boolean;
-  timelineSolved: boolean;
-  deductionAnswerId: string | null;
-  deductionClueIds: string[];
-  badges: DetectiveBadge[];
-  xp: number;
-  stars: number;
-  isCompleted: boolean;
+export interface MiniGameData {
+  type: 'TIMELINE' | 'CIPHER' | 'ROLE_MATCH';
+  title: string;
+  instructions: string;
+  isOpen: boolean;
 }
