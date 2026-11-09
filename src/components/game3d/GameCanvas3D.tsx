@@ -31,6 +31,32 @@ interface GameCanvas3DProps {
   initialWorldId?: HistoricalWorldId;
 }
 
+const SAVE_STORAGE_KEY = 'JEJAK_NUSANTARA_SAVE_V1';
+
+interface SavedGameState {
+  quests: Quest[];
+  activeQuestIndex: number;
+  collectibles: CollectibleItem[];
+  badges: DetectiveBadge[];
+  xp: number;
+  level: number;
+  savedAt: string;
+}
+
+const loadGameSave = (): SavedGameState | null => {
+  try {
+    const raw = localStorage.getItem(SAVE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.quests) && parsed.quests.length > 0) {
+      return parsed as SavedGameState;
+    }
+  } catch (err) {
+    console.warn('Could not parse saved game data:', err);
+  }
+  return null;
+};
+
 export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({ 
   onReturnToTitle,
   initialWorldId = 'WORLD_01_RENGASDENGKLOK'
@@ -38,16 +64,41 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Engine3D | null>(null);
 
+  // Load persistent save if available
+  const savedStateRef = useRef<SavedGameState | null>(loadGameSave());
+  const initialSave = savedStateRef.current;
+
   // Game States
   const [currentWorldId, setCurrentWorldId] = useState<HistoricalWorldId>(initialWorldId);
-  const [quests, setQuests] = useState<Quest[]>(WORLD_01_QUESTS);
-  const [activeQuestIndex, setActiveQuestIndex] = useState<number>(0);
-  const [collectibles, setCollectibles] = useState<CollectibleItem[]>(WORLD_01_COLLECTIBLES);
-  const [badges, setBadges] = useState<DetectiveBadge[]>(GAME_BADGES);
-  const [xp, setXp] = useState<number>(50);
-  const [level, setLevel] = useState<number>(1);
+  const [quests, setQuests] = useState<Quest[]>(() => {
+    if (initialSave?.quests && initialSave.quests.length === WORLD_01_QUESTS.length) {
+      return initialSave.quests;
+    }
+    return WORLD_01_QUESTS;
+  });
+  const [activeQuestIndex, setActiveQuestIndex] = useState<number>(() => {
+    if (typeof initialSave?.activeQuestIndex === 'number') {
+      return Math.min(Math.max(0, initialSave.activeQuestIndex), WORLD_01_QUESTS.length - 1);
+    }
+    return 0;
+  });
+  const [collectibles, setCollectibles] = useState<CollectibleItem[]>(() => {
+    if (initialSave?.collectibles) {
+      return initialSave.collectibles;
+    }
+    return WORLD_01_COLLECTIBLES;
+  });
+  const [badges, setBadges] = useState<DetectiveBadge[]>(() => {
+    if (initialSave?.badges) {
+      return initialSave.badges;
+    }
+    return GAME_BADGES;
+  });
+  const [xp, setXp] = useState<number>(() => initialSave?.xp ?? 50);
+  const [level, setLevel] = useState<number>(() => initialSave?.level ?? 1);
   const [stars, setStars] = useState<number>(3);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [completedQuestToast, setCompletedQuestToast] = useState<{ title: string; rewardXP: number } | null>(null);
 
   // Overlays state
   const [nearbyTarget, setNearbyTarget] = useState<NearbyTarget | null>(null);
@@ -59,11 +110,11 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isLevelCompleteOpen, setIsLevelCompleteOpen] = useState<boolean>(false);
 
-  // Real-time Movement Debugging HUD state (active by default during debugging)
-  const [isDebugOpen, setIsDebugOpen] = useState<boolean>(true);
+  // Real-time Movement Debugging HUD state
+  const [isDebugOpen, setIsDebugOpen] = useState<boolean>(false);
   const [debugTelemetry, setDebugTelemetry] = useState<DebugTelemetryData | null>(null);
 
-  // Active quest
+  // Active quest (Single Source of Truth)
   const activeQuest = quests[activeQuestIndex] || quests[0];
 
   // Helper to award XP and check Level Up
@@ -89,32 +140,116 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
     });
   }, [addXP]);
 
-  // Advance Quest Steps
-  const advanceActiveQuest = useCallback(() => {
+  // Auto-persist game progress to LocalStorage
+  useEffect(() => {
+    try {
+      const payload: SavedGameState = {
+        quests,
+        activeQuestIndex,
+        collectibles,
+        badges,
+        xp,
+        level,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Failed to save game state to LocalStorage:', err);
+    }
+  }, [quests, activeQuestIndex, collectibles, badges, xp, level]);
+
+  // Auto-dismiss completed quest toast banner after 3.5s
+  useEffect(() => {
+    if (completedQuestToast) {
+      const timer = setTimeout(() => {
+        setCompletedQuestToast(null);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [completedQuestToast]);
+
+  // Reset movement input on any overlay state change to prevent stuck keys
+  useEffect(() => {
+    engineRef.current?.resetMovementInput();
+  }, [
+    isJournalOpen,
+    isWorldSelectOpen,
+    isSettingsOpen,
+    isLevelCompleteOpen,
+    activeDialogueNPC,
+    activeMiniGame
+  ]);
+
+  // Advance single step within current quest
+  const advanceActiveQuestStep = useCallback(() => {
     setQuests(prev => {
-      const copy = [...prev];
+      const copy = prev.map(q => ({
+        ...q,
+        steps: q.steps.map(s => ({ ...s }))
+      }));
       const q = copy[activeQuestIndex];
-      if (!q) return prev;
+      if (!q || q.status === 'COMPLETED') return prev;
 
       if (q.currentStepIndex < q.steps.length - 1) {
         q.steps[q.currentStepIndex].isCompleted = true;
         q.currentStepIndex += 1;
         sound.playCompassChime();
+        return copy;
       } else {
+        // Complete the quest
         q.steps[q.currentStepIndex].isCompleted = true;
         q.isCompleted = true;
+        q.status = 'COMPLETED';
         sound.playQuestComplete();
         addXP(q.rewardXP);
 
-        // Advance to next quest if available
+        setCompletedQuestToast({
+          title: q.title,
+          rewardXP: q.rewardXP
+        });
+
         if (activeQuestIndex < copy.length - 1) {
+          copy[activeQuestIndex + 1].status = 'ACTIVE';
           setActiveQuestIndex(prevIdx => prevIdx + 1);
         } else {
-          // All quests finished! Trigger Level Complete Grand Finale
           unlockBadge('badge-master-adventurer');
           unlockBadge('badge-nusantara-explorer');
           setTimeout(() => setIsLevelCompleteOpen(true), 1200);
         }
+        return copy;
+      }
+    });
+  }, [activeQuestIndex, addXP, unlockBadge]);
+
+  // Complete entire current quest (e.g. after full dialogue or mini-game)
+  const completeActiveQuest = useCallback(() => {
+    setQuests(prev => {
+      const copy = prev.map(q => ({
+        ...q,
+        steps: q.steps.map(s => ({ ...s }))
+      }));
+      const q = copy[activeQuestIndex];
+      if (!q || q.status === 'COMPLETED') return prev;
+
+      q.steps.forEach(s => { s.isCompleted = true; });
+      q.currentStepIndex = q.steps.length - 1;
+      q.isCompleted = true;
+      q.status = 'COMPLETED';
+      sound.playQuestComplete();
+      addXP(q.rewardXP);
+
+      setCompletedQuestToast({
+        title: q.title,
+        rewardXP: q.rewardXP
+      });
+
+      if (activeQuestIndex < copy.length - 1) {
+        copy[activeQuestIndex + 1].status = 'ACTIVE';
+        setActiveQuestIndex(prevIdx => prevIdx + 1);
+      } else {
+        unlockBadge('badge-master-adventurer');
+        unlockBadge('badge-nusantara-explorer');
+        setTimeout(() => setIsLevelCompleteOpen(true), 1200);
       }
       return copy;
     });
@@ -131,15 +266,23 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
       setActiveDialogueNPC(npc);
 
       let lines = npc.dialogueTree.greeting;
-      if (npc.id === 'npc-singgih' && activeQuest.id === 'quest-01-singgih') {
-        lines = npc.dialogueTree.greeting;
-      } else if (npc.id === 'npc-djiaw') {
-        const hasPouch = collectibles.find(c => c.id === 'col-dispatch-pouch')?.isFound;
-        if (!hasPouch) {
-          lines = npc.dialogueTree.questDialogue || npc.dialogueTree.greeting;
+      if (npc.id === 'npc-singgih') {
+        if (activeQuest.id === 'quest-01-singgih') {
+          lines = npc.dialogueTree.greeting;
         } else {
           lines = npc.dialogueTree.completedDialogue || npc.dialogueTree.greeting;
         }
+      } else if (npc.id === 'npc-djiaw') {
+        const hasPouch = collectibles.find(c => c.id === 'col-dispatch-pouch')?.isFound;
+        if (activeQuest.id === 'quest-02-dispatch') {
+          lines = hasPouch 
+            ? (npc.dialogueTree.completedDialogue || npc.dialogueTree.greeting)
+            : (npc.dialogueTree.questDialogue || npc.dialogueTree.greeting);
+        } else {
+          lines = npc.dialogueTree.greeting;
+        }
+      } else if (npc.id === 'npc-soekarno' || npc.id === 'npc-hatta') {
+        lines = npc.dialogueTree.greeting;
       } else if (npc.id === 'npc-soebardjo') {
         lines = npc.dialogueTree.greeting;
       }
@@ -149,14 +292,38 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
       const item = target.entityData as CollectibleItem;
       collectItem(item);
     } else if (target.type === 'CHEST') {
-      setActiveMiniGame({
-        type: 'CIPHER',
-        title: 'Peti Sandi Telegraf Komando PETA',
-        instructions: 'Gembok komando ini disegel dengan sandi 4 digit. Petunjuk: Hari dan Bulan tibanya Bung Karno dan Bung Hatta di Rengasdengklok (Format DDMM).',
-        isOpen: true
-      });
+      if (activeQuest.id === 'quest-03-cipher') {
+        setActiveMiniGame({
+          type: 'CIPHER',
+          title: 'Peti Sandi Telegraf Komando PETA',
+          instructions: 'Gembok komando ini disegel dengan sandi 4 digit. Petunjuk: Hari dan Bulan tibanya Bung Karno dan Bung Hatta di Rengasdengklok (Format DDMM = 1608).',
+          isOpen: true
+        });
+      } else {
+        const isOpenAlready = activeQuestIndex > 2;
+        setActiveDialogueNPC({
+          id: 'npc-chest-info',
+          name: 'Peti Sandi Komando',
+          role: 'Perangkat Militer',
+          position: { x: -23, y: 0, z: -0.2 },
+          rotationY: 0,
+          modelStyle: 'peta',
+          dialogueTree: {
+            greeting: [
+              isOpenAlready
+                ? 'Peti sandi komando sudah terbuka. Kode 1608 telah diverifikasi.'
+                : 'Peti terkunci dengan sandi gembok 4 digit. Selesaikan misi sebelumnya untuk membuka.'
+            ]
+          }
+        });
+        setDialogueLines([
+          isOpenAlready
+            ? 'Peti sandi komando sudah terbuka. Kode 1608 telah diverifikasi.'
+            : 'Peti terkunci dengan sandi gembok 4 digit. Selesaikan misi sebelumnya untuk membuka.'
+        ]);
+      }
     }
-  }, [activeQuest.id, collectibles]);
+  }, [activeQuest.id, activeQuestIndex, collectibles]);
 
   // Collect artifact handler
   const collectItem = useCallback((item: CollectibleItem) => {
@@ -176,10 +343,10 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
       engineRef.current.removeCollectibleMesh(item.id);
     }
 
-    if (item.id === 'col-dispatch-pouch') {
-      advanceActiveQuest();
+    if (item.id === 'col-dispatch-pouch' && activeQuest.id === 'quest-02-dispatch') {
+      advanceActiveQuestStep();
     }
-  }, [addXP, advanceActiveQuest, unlockBadge]);
+  }, [addXP, advanceActiveQuestStep, unlockBadge, activeQuest.id]);
 
   // Action key dispatch from engine
   const handleActionKey = useCallback((action: ActionKeyType) => {
@@ -260,17 +427,20 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
     const speakerId = activeDialogueNPC?.id;
     setActiveDialogueNPC(null);
     setDialogueLines([]);
+    engineRef.current?.resetMovementInput();
 
     if (speakerId === 'npc-singgih' && activeQuest.id === 'quest-01-singgih') {
-      advanceActiveQuest();
-    } else if (speakerId === 'npc-djiaw') {
+      completeActiveQuest();
+    } else if (speakerId === 'npc-djiaw' && activeQuest.id === 'quest-02-dispatch') {
       const hasPouch = collectibles.find(c => c.id === 'col-dispatch-pouch')?.isFound;
-      if (hasPouch && activeQuest.id === 'quest-02-dispatch') {
-        advanceActiveQuest();
+      if (hasPouch) {
+        completeActiveQuest();
+      } else if (activeQuest.currentStepIndex === 0) {
+        advanceActiveQuestStep();
       }
-    } else if (speakerId === 'npc-soekarno' && activeQuest.id === 'quest-04-veranda') {
-      advanceActiveQuest();
-    } else if (speakerId === 'npc-soebardjo') {
+    } else if ((speakerId === 'npc-soekarno' || speakerId === 'npc-hatta') && activeQuest.id === 'quest-04-veranda') {
+      completeActiveQuest();
+    } else if (speakerId === 'npc-soebardjo' && activeQuest.id === 'quest-05-timeline') {
       setActiveMiniGame({
         type: 'TIMELINE',
         title: 'Kronologi Detik-Detik Menuju Proklamasi',
@@ -284,13 +454,12 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
   const handleMiniGameSuccess = () => {
     const gameType = activeMiniGame?.type;
     setActiveMiniGame(null);
+    engineRef.current?.resetMovementInput();
 
-    if (gameType === 'CIPHER') {
-      addXP(150);
-      advanceActiveQuest();
-    } else if (gameType === 'TIMELINE') {
-      addXP(200);
-      advanceActiveQuest();
+    if (gameType === 'CIPHER' && activeQuest.id === 'quest-03-cipher') {
+      completeActiveQuest();
+    } else if (gameType === 'TIMELINE' && activeQuest.id === 'quest-05-timeline') {
+      completeActiveQuest();
     } else if (gameType === 'ROLE_MATCH') {
       addXP(150);
     }
@@ -344,12 +513,25 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
   };
 
   const restartWorld = () => {
+    try {
+      localStorage.removeItem(SAVE_STORAGE_KEY);
+    } catch { /* ignore */ }
+
     if (engineRef.current) {
       engineRef.current.player.mesh.position.set(0, 0, 24);
       engineRef.current.playerVelocity.set(0, 0, 0);
+      engineRef.current.resetMovementInput();
     }
-    setQuests(WORLD_01_QUESTS);
+    setQuests(WORLD_01_QUESTS.map(q => ({
+      ...q,
+      steps: q.steps.map(s => ({ ...s }))
+    })));
     setActiveQuestIndex(0);
+    setCollectibles(WORLD_01_COLLECTIBLES.map(c => ({ ...c })));
+    setBadges(GAME_BADGES.map(b => ({ ...b })));
+    setXp(50);
+    setLevel(1);
+    setCompletedQuestToast(null);
     sound.playClick();
   };
 
@@ -373,6 +555,7 @@ export const GameCanvas3D: React.FC<GameCanvas3DProps> = ({
         xp={xp}
         level={level}
         nearbyPrompt={nearbyTarget ? nearbyTarget.prompt : null}
+        completedQuestToast={completedQuestToast}
         onInteract={handleInteract}
         onOpenJournal={() => setIsJournalOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}

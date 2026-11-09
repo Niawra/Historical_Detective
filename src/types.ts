@@ -34,6 +34,8 @@ export interface CharacterControlState {
 
 export type AnimationState = 'IDLE' | 'WALK' | 'RUN' | 'JUMP' | 'INTERACT';
 
+export type QuestStatus = 'LOCKED' | 'AVAILABLE' | 'ACTIVE' | 'COMPLETED';
+
 export interface QuestStep {
   id: string;
   description: string;
@@ -50,6 +52,7 @@ export interface Quest {
   npcRole: string;
   description: string;
   isMainQuest: boolean;
+  status: QuestStatus;
   steps: QuestStep[];
   currentStepIndex: number;
   isCompleted: boolean;

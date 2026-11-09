@@ -19,6 +19,7 @@ interface HUDOverlayProps {
   xp: number;
   level: number;
   nearbyPrompt: string | null;
+  completedQuestToast?: { title: string; rewardXP: number } | null;
   onInteract: () => void;
   onOpenJournal: () => void;
   onOpenSettings: () => void;
@@ -34,6 +35,7 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({
   xp,
   level,
   nearbyPrompt,
+  completedQuestToast = null,
   onInteract,
   onOpenJournal,
   onOpenSettings,
@@ -54,6 +56,30 @@ export const HUDOverlay: React.FC<HUDOverlayProps> = ({
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none flex flex-col justify-between p-3 sm:p-5 z-20">
+      {/* Quest Completed Banner Notification */}
+      {completedQuestToast && (
+        <div className="fixed top-14 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none transition-all duration-300">
+          <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-[2px] rounded-2xl shadow-2xl animate-pulse">
+            <div className="bg-[#1b1510]/95 backdrop-blur-md px-6 py-3.5 rounded-2xl flex items-center gap-3.5 border border-amber-400/50">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-black flex items-center justify-center text-xl font-black shadow-md">
+                ✓
+              </div>
+              <div>
+                <span className="font-mono text-[10px] text-amber-400 uppercase tracking-widest font-black block">
+                  Misi Selesai!
+                </span>
+                <h4 className="font-serif font-black text-sm text-white">
+                  {completedQuestToast.title}
+                </h4>
+              </div>
+              <div className="ml-3 pl-3 border-l border-white/20 font-mono text-emerald-400 font-bold text-xs">
+                +{completedQuestToast.rewardXP} XP
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header Bar */}
       <div className="flex items-start justify-between gap-3 w-full">
         {/* Left: Minimalist Mission Tracker Panel */}

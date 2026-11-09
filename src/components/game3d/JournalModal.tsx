@@ -194,56 +194,74 @@ export const JournalModal: React.FC<JournalModalProps> = ({
         {/* Tab 2: Quests */}
         {activeTab === 'QUESTS' && (
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {quests.map((quest) => (
-              <div
-                key={quest.id}
-                className={`p-4 rounded-2xl border ${
-                  quest.isCompleted
-                    ? 'bg-emerald-950/20 border-emerald-600/60'
-                    : 'bg-[#231b14] border-amber-600/60'
-                }`}
-              >
-                <div className="flex items-start justify-between border-b border-parchment-800 pb-2 mb-3">
-                  <div>
-                    <span className="font-mono text-[10px] text-amber-400 font-bold uppercase">
-                      {quest.isMainQuest ? '★ Misi Utama' : 'Side Quest'} • Pemberi: {quest.npcName}
-                    </span>
-                    <h4 className="font-serif font-black text-sm sm:text-base text-parchment-100 mt-0.5">
-                      {quest.title}
-                    </h4>
-                  </div>
-                  <span className={`px-2.5 py-0.5 rounded-full font-mono text-[10px] font-bold ${
-                    quest.isCompleted ? 'bg-emerald-900 text-emerald-300' : 'bg-amber-900 text-amber-300'
-                  }`}>
-                    {quest.isCompleted ? 'SELESAI ✓' : 'SEDANG BERJALAN'}
-                  </span>
-                </div>
+            {quests.map((quest) => {
+              const isDone = quest.status === 'COMPLETED' || quest.isCompleted;
+              const isActive = quest.status === 'ACTIVE' && !isDone;
+              const isLocked = quest.status === 'LOCKED';
 
-                <p className="font-serif text-xs text-parchment-300 mb-3 leading-relaxed">
-                  {quest.description}
-                </p>
-
-                {/* Steps */}
-                <div className="space-y-1.5 bg-[#18130e] p-3 rounded-xl border border-parchment-800 text-xs font-serif">
-                  {quest.steps.map((st, i) => (
-                    <div key={st.id} className="flex items-center space-x-2">
-                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-bold ${
-                        quest.currentStepIndex > i || quest.isCompleted
-                          ? 'bg-emerald-600 text-white'
-                          : quest.currentStepIndex === i
-                          ? 'bg-amber-500 text-black'
-                          : 'bg-parchment-800 text-parchment-500'
-                      }`}>
-                        {i + 1}
+              return (
+                <div
+                  key={quest.id}
+                  className={`p-4 rounded-2xl border transition-all ${
+                    isDone
+                      ? 'bg-emerald-950/20 border-emerald-600/60'
+                      : isActive
+                      ? 'bg-amber-950/30 border-amber-500 shadow-lg shadow-amber-950/30'
+                      : 'bg-[#18130e] border-parchment-900/60 opacity-60'
+                  }`}
+                >
+                  <div className="flex items-start justify-between border-b border-parchment-800 pb-2 mb-3">
+                    <div>
+                      <span className="font-mono text-[10px] text-amber-400 font-bold uppercase">
+                        {quest.isMainQuest ? '★ Misi Utama' : 'Side Quest'} • Pemberi: {quest.npcName}
                       </span>
-                      <span className={quest.currentStepIndex > i || quest.isCompleted ? 'line-through text-parchment-500' : 'text-parchment-200'}>
-                        {st.description}
-                      </span>
+                      <h4 className="font-serif font-black text-sm sm:text-base text-parchment-100 mt-0.5">
+                        {quest.title}
+                      </h4>
                     </div>
-                  ))}
+                    <span className={`px-2.5 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                      isDone
+                        ? 'bg-emerald-900 text-emerald-300'
+                        : isActive
+                        ? 'bg-amber-500 text-black animate-pulse'
+                        : 'bg-zinc-800 text-zinc-400'
+                    }`}>
+                      {isDone ? 'SELESAI ✓' : isActive ? 'SEDANG AKTIF ★' : 'TERKUNCI 🔒'}
+                    </span>
+                  </div>
+
+                  <p className="font-serif text-xs text-parchment-300 mb-3 leading-relaxed">
+                    {quest.description}
+                  </p>
+
+                  {/* Steps */}
+                  <div className="space-y-1.5 bg-[#14100c] p-3 rounded-xl border border-parchment-800/80 text-xs font-serif">
+                    {isLocked ? (
+                      <div className="text-parchment-500 italic text-[11px] font-mono flex items-center gap-1.5">
+                        <span>🔒</span> Selesaikan misi sebelumnya untuk membuka instruksi ini.
+                      </div>
+                    ) : (
+                      quest.steps.map((st, i) => (
+                        <div key={st.id} className="flex items-center space-x-2">
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-bold ${
+                            quest.currentStepIndex > i || isDone
+                              ? 'bg-emerald-600 text-white'
+                              : quest.currentStepIndex === i
+                              ? 'bg-amber-500 text-black'
+                              : 'bg-parchment-800 text-parchment-500'
+                          }`}>
+                            {i + 1}
+                          </span>
+                          <span className={quest.currentStepIndex > i || isDone ? 'line-through text-parchment-500' : 'text-parchment-200'}>
+                            {st.description}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

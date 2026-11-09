@@ -46,6 +46,7 @@ export class Engine3D {
   public currentAnim: AnimationState = 'IDLE';
 
   // Controls state
+  private pressedKeys: Set<string> = new Set<string>();
   public controls: CharacterControlState = {
     forward: false,
     backward: false,
@@ -280,7 +281,47 @@ export class Engine3D {
       container.removeEventListener('touchmove', onTouchMove);
     });
 
-    // 3. Direct Keyboard Input Handlers with Full Code & Key Support
+    // 3. Direct Keyboard Input Handlers with Full Code & Key Support and Multi-Key Tracking
+    const updateControlsFromPressedKeys = () => {
+      this.controls.forward = 
+        this.pressedKeys.has('KeyW') || 
+        this.pressedKeys.has('ArrowUp') || 
+        this.pressedKeys.has('w') || 
+        this.pressedKeys.has('arrowup') || 
+        this.pressedKeys.has('up');
+
+      this.controls.backward = 
+        this.pressedKeys.has('KeyS') || 
+        this.pressedKeys.has('ArrowDown') || 
+        this.pressedKeys.has('s') || 
+        this.pressedKeys.has('arrowdown') || 
+        this.pressedKeys.has('down');
+
+      this.controls.left = 
+        this.pressedKeys.has('KeyA') || 
+        this.pressedKeys.has('ArrowLeft') || 
+        this.pressedKeys.has('a') || 
+        this.pressedKeys.has('arrowleft') || 
+        this.pressedKeys.has('left');
+
+      this.controls.right = 
+        this.pressedKeys.has('KeyD') || 
+        this.pressedKeys.has('ArrowRight') || 
+        this.pressedKeys.has('d') || 
+        this.pressedKeys.has('arrowright') || 
+        this.pressedKeys.has('right');
+
+      this.controls.jump = 
+        this.pressedKeys.has('Space') || 
+        this.pressedKeys.has(' ') || 
+        this.pressedKeys.has('spacebar');
+
+      this.controls.sprint = 
+        this.pressedKeys.has('ShiftLeft') || 
+        this.pressedKeys.has('ShiftRight') || 
+        this.pressedKeys.has('shift');
+    };
+
     const handleKey = (e: KeyboardEvent, isDown: boolean) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -288,43 +329,15 @@ export class Engine3D {
       const code = e.code;
       const key = e.key ? e.key.toLowerCase() : '';
 
-      let matchedMovement = false;
-
-      // FORWARD: W or ArrowUp
-      if (code === 'KeyW' || code === 'ArrowUp' || key === 'w' || key === 'arrowup' || key === 'up') {
-        this.controls.forward = isDown;
-        matchedMovement = true;
+      if (isDown) {
+        if (code) this.pressedKeys.add(code);
+        if (key) this.pressedKeys.add(key);
+      } else {
+        if (code) this.pressedKeys.delete(code);
+        if (key) this.pressedKeys.delete(key);
       }
 
-      // BACKWARD: S or ArrowDown
-      if (code === 'KeyS' || code === 'ArrowDown' || key === 's' || key === 'arrowdown' || key === 'down') {
-        this.controls.backward = isDown;
-        matchedMovement = true;
-      }
-
-      // LEFT: A or ArrowLeft
-      if (code === 'KeyA' || code === 'ArrowLeft' || key === 'a' || key === 'arrowleft' || key === 'left') {
-        this.controls.left = isDown;
-        matchedMovement = true;
-      }
-
-      // RIGHT: D or ArrowRight
-      if (code === 'KeyD' || code === 'ArrowRight' || key === 'd' || key === 'arrowright' || key === 'right') {
-        this.controls.right = isDown;
-        matchedMovement = true;
-      }
-
-      // JUMP: Space
-      if (code === 'Space' || key === ' ' || key === 'spacebar') {
-        this.controls.jump = isDown;
-        matchedMovement = true;
-      }
-
-      // SPRINT: Shift
-      if (code === 'ShiftLeft' || code === 'ShiftRight' || key === 'shift') {
-        this.controls.sprint = isDown;
-        matchedMovement = true;
-      }
+      updateControlsFromPressedKeys();
 
       // Action shortcuts on KeyDown only
       if (isDown) {
@@ -344,7 +357,8 @@ export class Engine3D {
         }
       }
 
-      if (matchedMovement && (code === 'Space' || code === 'ArrowUp' || code === 'ArrowDown')) {
+      const isMovementKey = code === 'Space' || code === 'ArrowUp' || code === 'ArrowDown' || code === 'ArrowLeft' || code === 'ArrowRight';
+      if (isMovementKey) {
         e.preventDefault();
       }
     };
@@ -352,25 +366,41 @@ export class Engine3D {
     const onKeyDown = (e: KeyboardEvent) => handleKey(e, true);
     const onKeyUp = (e: KeyboardEvent) => handleKey(e, false);
 
-    // Reset controls when window loses focus
+    // Reset controls when window loses focus or document is hidden
     const onBlur = () => {
-      this.controls.forward = false;
-      this.controls.backward = false;
-      this.controls.left = false;
-      this.controls.right = false;
-      this.controls.jump = false;
-      this.controls.sprint = false;
+      this.resetMovementInput();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        this.resetMovementInput();
+      }
     };
 
     window.addEventListener('keydown', onKeyDown, { capture: true });
     window.addEventListener('keyup', onKeyUp, { capture: true });
     window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     this.cleanupListeners.push(() => {
       window.removeEventListener('keydown', onKeyDown, { capture: true });
       window.removeEventListener('keyup', onKeyUp, { capture: true });
       window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     });
+  }
+
+  public resetMovementInput(): void {
+    this.pressedKeys.clear();
+    this.controls.forward = false;
+    this.controls.backward = false;
+    this.controls.left = false;
+    this.controls.right = false;
+    this.controls.jump = false;
+    this.controls.sprint = false;
+    this.controls.interact = false;
+    this.playerVelocity.x = 0;
+    this.playerVelocity.z = 0;
   }
 
   public handleResize(width: number, height: number): void {
@@ -448,16 +478,17 @@ export class Engine3D {
       this.playerVelocity.x = vx;
       this.playerVelocity.z = vz;
 
-      const nextX = this.player.mesh.position.x + vx * delta;
-      const nextZ = this.player.mesh.position.z + vz * delta;
-
-      // Collision Check (AABB box checking) with sliding
-      if (!WorldBuilder.checkCollision(nextX, this.player.mesh.position.z, 0.45)) {
-        this.player.mesh.position.x = nextX;
-      }
-      if (!WorldBuilder.checkCollision(this.player.mesh.position.x, nextZ, 0.45)) {
-        this.player.mesh.position.z = nextZ;
-      }
+      // Robust sliding collision with surface alignment
+      const resolved = WorldBuilder.moveWithSliding(
+        this.player.mesh.position.x,
+        this.player.mesh.position.z,
+        vx,
+        vz,
+        delta,
+        0.45
+      );
+      this.player.mesh.position.x = resolved.x;
+      this.player.mesh.position.z = resolved.z;
 
       // Footstep sound
       this.stepCooldown += delta;

@@ -82,6 +82,7 @@ export const WORLD_01_QUESTS: Quest[] = [
     npcRole: 'Perwira Peleton PETA Purwakarta',
     description: 'Bicaralah dengan Shodanco Singgih di pos penjagaan menara PETA untuk mengetahui situasi pengamanan Bung Karno dan Bung Hatta di Rengasdengklok.',
     isMainQuest: true,
+    status: 'ACTIVE',
     steps: [
       { id: 's1', description: 'Dekati pos menara bendera PETA dan bicara dengan Shodanco Singgih.', isCompleted: false },
       { id: 's2', description: 'Ketahui alasan mengapa Rengasdengklok dipilih sebagai basis pengamanan.', isCompleted: false }
@@ -99,6 +100,7 @@ export const WORLD_01_QUESTS: Quest[] = [
     npcRole: 'Pemilik Rumah Singgah Bersejarah',
     description: 'Djiaw Kie Siong kehilangan kantong berkas penting dari para pemuda di dekat rerumpunan bambu tepi sungai. Temukan dan kembalikan kantong tersebut!',
     isMainQuest: false,
+    status: 'LOCKED',
     steps: [
       { id: 's1', description: 'Bicara dengan Djiaw Kie Siong di pelataran rumahnya.', isCompleted: false },
       { id: 's2', description: 'Cari kantong berkas yang jatuh di antara pepohonan bambu tepi Citarum.', targetLocation: { x: 28, z: -25 }, isCompleted: false },
@@ -117,6 +119,7 @@ export const WORLD_01_QUESTS: Quest[] = [
     npcRole: 'Perangkat Komunikasi Lapangan',
     description: 'Buka peti sandi telegraf komando PETA di dekat truk militer dengan memecahkan kombinasi angka 4 digit.',
     isMainQuest: true,
+    status: 'LOCKED',
     steps: [
       { id: 's1', description: 'Dekati peti sandi di dekat pos truk militer.', isCompleted: false },
       { id: 's2', description: 'Pecahkan kode 4 digit (Hari dan Bulan kedatangan di Rengasdengklok).', isCompleted: false }
@@ -134,6 +137,7 @@ export const WORLD_01_QUESTS: Quest[] = [
     npcRole: 'Proklamator Bangsa',
     description: 'Kunjungi Bung Karno dan Bung Hatta di serambi rumah bersejarah. Dengarkan pertimbangan mendalam mengenai waktu pembacaan Proklamasi.',
     isMainQuest: true,
+    status: 'LOCKED',
     steps: [
       { id: 's1', description: 'Naik ke serambi rumah Djiaw Kie Siong.', isCompleted: false },
       { id: 's2', description: 'Bicara dengan Bung Karno dan pahami dialektika antara Golongan Tua dan Golongan Muda.', isCompleted: false }
@@ -151,6 +155,7 @@ export const WORLD_01_QUESTS: Quest[] = [
     npcRole: 'Tokoh Penengah Diplomatik',
     description: 'Sambut kedatangan Mr. Achmad Soebardjo di Rengasdengklok dan selesaikan tantangan kronologi waktu untuk mengawal kepulangan proklamator ke Jakarta!',
     isMainQuest: true,
+    status: 'LOCKED',
     steps: [
       { id: 's1', description: 'Bicara dengan Mr. Achmad Soebardjo di dekat gerbang masuk desa.', isCompleted: false },
       { id: 's2', description: 'Susun kartu urutan kronologi peristiwa 14–17 Agustus 1945 di Chronicle Compass.', isCompleted: false },

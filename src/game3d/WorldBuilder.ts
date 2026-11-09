@@ -144,12 +144,18 @@ export class WorldBuilder {
     // --- 7. DIRECTIONAL SIGNPOST & LANDMARKS ---
     this.buildSignpostsAndBenches(scene);
 
-    // --- 8. RICE PADDIES, BAMBOO & VEGETATION ---
+    // --- 8. HISTORICAL VILLAGE PROPS (Drying racks, well, haystacks, lanterns) ---
+    this.buildHistoricalVillageProps(scene);
+
+    // --- 9. RICE PADDIES, BAMBOO & VEGETATION ---
     this.buildRicePaddies(scene);
     this.buildBambooGroves(scene);
     this.buildTreesAndFences(scene);
 
-    // --- 9. STYLIZED DRIFTING CLOUDS ---
+    // --- 10. NPC & STATIC OBSTACLE COLLIDERS ---
+    this.registerObstacleCollisions();
+
+    // --- 11. STYLIZED DRIFTING CLOUDS ---
     this.buildClouds(scene);
   }
 
@@ -447,6 +453,19 @@ export class WorldBuilder {
       minZ: -6.0,
       maxZ: 2.0
     });
+    // Sandbag Bunkers collision
+    this.collisionBoxes.push({
+      minX: -28.2,
+      maxX: -25.4,
+      minZ: -1.6,
+      maxZ: 0.0
+    });
+    this.collisionBoxes.push({
+      minX: -20.6,
+      maxX: -17.8,
+      minZ: -1.6,
+      maxZ: 0.0
+    });
   }
 
   private static buildVillageCottages(scene: THREE.Scene): void {
@@ -563,6 +582,206 @@ export class WorldBuilder {
       bench.position.set(bx, 0.35, bZ);
       bench.castShadow = true;
       scene.add(bench);
+
+      // Register bench collision
+      this.collisionBoxes.push({
+        minX: bx - 1.1,
+        maxX: bx + 1.1,
+        minZ: bZ - 0.45,
+        maxZ: bZ + 0.45
+      });
+    });
+
+    // Register signpost collision
+    this.collisionBoxes.push({
+      minX: 3.0,
+      maxX: 3.4,
+      minZ: 2.3,
+      maxZ: 2.7
+    });
+  }
+
+  private static buildHistoricalVillageProps(scene: THREE.Scene): void {
+    const woodMat = new THREE.MeshLambertMaterial({ color: 0x4a2e1b });
+    const bambooMat = new THREE.MeshLambertMaterial({ color: 0xd4bc8b });
+    const strawMat = new THREE.MeshLambertMaterial({ color: 0xc49a45, flatShading: true });
+    const stoneMat = new THREE.MeshLambertMaterial({ color: 0x6e757c, flatShading: true });
+
+    // 1. Traditional Village Water Well (Sumur Timba) at x = -6, z = 6
+    const wellGroup = new THREE.Group();
+    wellGroup.position.set(-6, 0, 6);
+
+    const wellBase = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.25, 0.85, 12), stoneMat);
+    wellBase.position.set(0, 0.42, 0);
+    wellBase.castShadow = true;
+    wellBase.receiveShadow = true;
+    wellGroup.add(wellBase);
+
+    // Water surface inside well
+    const wellWater = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.9, 0.9, 0.1, 10),
+      new THREE.MeshStandardMaterial({ color: 0x1d4e89, roughness: 0.1 })
+    );
+    wellWater.position.set(0, 0.35, 0);
+    wellGroup.add(wellWater);
+
+    // Well Roof Posts
+    [-0.9, 0.9].forEach(wx => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.3, 6), woodMat);
+      post.position.set(wx, 1.15, 0);
+      post.castShadow = true;
+      wellGroup.add(post);
+    });
+
+    // Well Roof
+    const wellRoof = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.0, 4), woodMat);
+    wellRoof.rotateY(Math.PI / 4);
+    wellRoof.position.set(0, 2.4, 0);
+    wellRoof.castShadow = true;
+    wellGroup.add(wellRoof);
+
+    // Wooden Bucket
+    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.32, 8), woodMat);
+    bucket.position.set(0.65, 0.95, 0.4);
+    bucket.castShadow = true;
+    wellGroup.add(bucket);
+
+    scene.add(wellGroup);
+
+    // 2. Traditional Bamboo Rice Drying Racks (Jemuran Padi / Kerupuk)
+    const rackPositions = [
+      { x: 10, z: -8, rot: 0.2 },
+      { x: -14, z: 12, rot: -0.3 }
+    ];
+
+    rackPositions.forEach(rp => {
+      const rackGroup = new THREE.Group();
+      rackGroup.position.set(rp.x, 0, rp.z);
+      rackGroup.rotation.y = rp.rot;
+
+      // Two A-frame bamboo legs
+      [-1.4, 1.4].forEach(rx => {
+        const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 6), bambooMat);
+        leg1.rotation.z = 0.25;
+        leg1.position.set(rx - 0.2, 0.75, 0);
+        const leg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.6, 6), bambooMat);
+        leg2.rotation.z = -0.25;
+        leg2.position.set(rx + 0.2, 0.75, 0);
+        leg1.castShadow = true;
+        leg2.castShadow = true;
+        rackGroup.add(leg1, leg2);
+      });
+
+      // Horizontal cross pole
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.4, 6), bambooMat);
+      pole.rotation.z = Math.PI / 2;
+      pole.position.set(0, 1.4, 0);
+      pole.castShadow = true;
+      rackGroup.add(pole);
+
+      // Hanging drying mats with harvest
+      const matGeo = new THREE.PlaneGeometry(2.6, 0.9);
+      const clothMat = new THREE.MeshLambertMaterial({ color: 0xdeb887, side: THREE.DoubleSide });
+      const mat = new THREE.Mesh(matGeo, clothMat);
+      mat.position.set(0, 0.9, 0);
+      mat.castShadow = true;
+      rackGroup.add(mat);
+
+      scene.add(rackGroup);
+    });
+
+    // 3. Haystacks (Tumpukan Jerami Padi)
+    const haystackPositions = [
+      { x: 18, z: 18, s: 1.2 },
+      { x: -14, z: 24, s: 1.0 }
+    ];
+
+    haystackPositions.forEach(hp => {
+      const hayGroup = new THREE.Group();
+      hayGroup.position.set(hp.x, 0, hp.z);
+
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * hp.s, 1.5 * hp.s, 1.2 * hp.s, 10), strawMat);
+      base.position.set(0, 0.6 * hp.s, 0);
+      base.castShadow = true;
+      hayGroup.add(base);
+
+      const top = new THREE.Mesh(new THREE.ConeGeometry(1.3 * hp.s, 1.2 * hp.s, 10), strawMat);
+      top.position.set(0, 1.7 * hp.s, 0);
+      top.castShadow = true;
+      hayGroup.add(top);
+
+      scene.add(hayGroup);
+    });
+
+    // 4. Traditional Bamboo Bird Cages on Tall Bamboo Poles (Sangkar Perkutut)
+    [
+      { x: 6.5, z: 2.0 },
+      { x: -8, z: 0 }
+    ].forEach(bp => {
+      const birdGroup = new THREE.Group();
+      birdGroup.position.set(bp.x, 0, bp.z);
+
+      const tallPole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 4.2, 6), bambooMat);
+      tallPole.position.set(0, 2.1, 0);
+      tallPole.castShadow = true;
+      birdGroup.add(tallPole);
+
+      const cage = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.3, 0.25, 0.5, 8),
+        new THREE.MeshLambertMaterial({ color: 0x936639 })
+      );
+      cage.position.set(0, 4.2, 0);
+      cage.castShadow = true;
+      birdGroup.add(cage);
+
+      scene.add(birdGroup);
+    });
+  }
+
+  private static registerObstacleCollisions(): void {
+    // 1. Village Well Collider
+    this.collisionBoxes.push({
+      minX: -7.2,
+      maxX: -4.8,
+      minZ: 4.8,
+      maxZ: 7.2
+    });
+
+    // 2. Haystack Colliders
+    this.collisionBoxes.push({
+      minX: 16.5,
+      maxX: 19.5,
+      minZ: 16.5,
+      maxZ: 19.5
+    });
+    this.collisionBoxes.push({
+      minX: -15.5,
+      maxX: -12.5,
+      minZ: 22.5,
+      maxZ: 25.5
+    });
+
+    // 3. NPC Obstacle Colliders (so player cannot pass through NPCs)
+    // Singgih at Pos PETA
+    this.collisionBoxes.push({
+      minX: -21.6,
+      maxX: -20.4,
+      minZ: -3.6,
+      maxZ: -2.4
+    });
+    // Djiaw Kie Siong
+    this.collisionBoxes.push({
+      minX: 4.9,
+      maxX: 6.1,
+      minZ: -5.1,
+      maxZ: -3.9
+    });
+    // Achmad Soebardjo
+    this.collisionBoxes.push({
+      minX: -3.1,
+      maxX: -1.9,
+      minZ: 19.4,
+      maxZ: 20.6
     });
   }
 
@@ -713,6 +932,21 @@ export class WorldBuilder {
       rail.castShadow = true;
       scene.add(rail);
     }
+
+    // Register Solid Fence Collision Boxes (prevents walking through courtyard fences)
+    this.collisionBoxes.push({
+      minX: 8.2,
+      maxX: 8.8,
+      minZ: -17.5,
+      maxZ: -0.5
+    });
+
+    this.collisionBoxes.push({
+      minX: -8.8,
+      maxX: -8.2,
+      minZ: -17.5,
+      maxZ: -3.5
+    });
   }
 
   private static buildClouds(scene: THREE.Scene): void {
@@ -772,5 +1006,74 @@ export class WorldBuilder {
     }
 
     return false;
+  }
+
+  // Move player with smooth sliding and surface alignment
+  public static moveWithSliding(
+    currentX: number,
+    currentZ: number,
+    vx: number,
+    vz: number,
+    delta: number,
+    radius: number = 0.45
+  ): { x: number; z: number } {
+    if (!this.enableCollision) {
+      return { x: currentX + vx * delta, z: currentZ + vz * delta };
+    }
+
+    let nextX = currentX + vx * delta;
+    let nextZ = currentZ + vz * delta;
+
+    // Check X movement
+    if (this.checkCollision(nextX, currentZ, radius)) {
+      for (const box of this.collisionBoxes) {
+        if (
+          nextX + radius > box.minX &&
+          nextX - radius < box.maxX &&
+          currentZ + radius > box.minZ &&
+          currentZ - radius < box.maxZ
+        ) {
+          if (vx > 0) nextX = box.minX - radius - 0.005;
+          else if (vx < 0) nextX = box.maxX + radius + 0.005;
+          break;
+        }
+      }
+      if (this.checkCollision(nextX, currentZ, radius)) {
+        nextX = currentX;
+      }
+    }
+
+    // Check Z movement with resolved nextX
+    if (this.checkCollision(nextX, nextZ, radius)) {
+      for (const box of this.collisionBoxes) {
+        if (
+          nextX + radius > box.minX &&
+          nextX - radius < box.maxX &&
+          nextZ + radius > box.minZ &&
+          nextZ - radius < box.maxZ
+        ) {
+          if (vz > 0) nextZ = box.minZ - radius - 0.005;
+          else if (vz < 0) nextZ = box.maxZ + radius + 0.005;
+          break;
+        }
+      }
+      if (this.checkCollision(nextX, nextZ, radius)) {
+        nextZ = currentZ;
+      }
+    }
+
+    // Final safety clamp against world boundaries and deep river
+    if (this.checkCollision(nextX, nextZ, radius)) {
+      if (!this.checkCollision(nextX, currentZ, radius)) {
+        nextZ = currentZ;
+      } else if (!this.checkCollision(currentX, nextZ, radius)) {
+        nextX = currentX;
+      } else {
+        nextX = currentX;
+        nextZ = currentZ;
+      }
+    }
+
+    return { x: nextX, z: nextZ };
   }
 }
